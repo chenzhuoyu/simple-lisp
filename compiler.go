@@ -27,8 +27,6 @@ const (
     OP_cons             // cons                     : Construct a new pair from stack top.
     OP_eval             // eval                     : Evaluate the value on stack top.
     OP_drop             // drop                     : Drop one value from stack.
-    OP_enter            // enter                    : Enter a new scope.
-    OP_leave            // leave                    : Leave to the parent scope.
     OP_goto             // goto         <pc>        : Goto <pc> unconditionally.
     OP_if_false         // if_false     <pc>        : If the stack top is #f, goto <pc>.
     OP_apply            // apply        <argc>      : Apply procedure on stack with <argc> arguments.
@@ -52,8 +50,6 @@ func (self Instr) String() string {
         case OP_cons    : return "cons"
         case OP_eval    : return "eval"
         case OP_drop    : return "drop"
-        case OP_enter   : return "enter"
-        case OP_leave   : return "leave"
         case OP_goto    : return fmt.Sprintf("goto       @%d", self.Iv)
         case OP_if_false: return fmt.Sprintf("if_false   @%d", self.Iv)
         case OP_apply   : return fmt.Sprintf("apply       %d", self.Iv)
@@ -95,6 +91,62 @@ func (self Compiler) Compile(src *List) (p Program) {
     return
 }
 
+func (self Compiler) desugarDo(v *List) *List {
+    return v
+}
+
+func (self Compiler) desugarLet(v *List, isParallel bool) *List {
+    var decl *List
+    var body *List
+    var defs []Value
+    var init []Value
+
+    /* list header */
+    p := v
+    n := 0
+    ok := false
+
+    /* deconstruct the list */
+    if decl, ok = AsList(p.Car); !ok { panic("compile: malformed let construct: " + v.String()) }
+    if body, ok = AsList(p.Cdr); !ok { panic("compile: malformed let construct: " + v.String()) }
+
+    /* parse the declarations */
+    for p = decl; p != nil; n++ {
+        var s Atom
+        var q *List
+
+        /* get the pair, and move to next item */
+        if q, ok = AsList(p.Car); !ok { panic("compile: malformed let construct: " + v.String()) }
+        if p, ok = AsList(p.Cdr); !ok { panic("compile: malformed let construct: " + v.String()) }
+        if s, ok = q.Car.(Atom) ; !ok { panic("compile: malformed let construct: " + v.String()) }
+        if q, ok = AsList(q.Cdr); !ok { panic("compile: malformed let construct: " + v.String()) }
+        if q.Cdr != nil               { panic("compile: malformed let construct: " + v.String()) }
+
+        /* add to initializer list */
+        defs = append(defs, s)
+        init = append(init, q.Car)
+    }
+
+    /* let star, evaluate one value at a time */
+    if !isParallel {
+        n = 1
+    }
+
+    /* rebuild as immediate lambda application expression */
+    for i := len(defs) - n; i >= 0; i-- {
+        arg := MakeList(defs[i:i + n]...)
+        ref := MakePair(Atom(Lambda), MakePair(arg, body))
+        body = MakeList(append([]Value{ref}, init[i:i + n]...)...)
+    }
+
+    /* all done */
+    return body
+}
+
+func (self Compiler) desugarBegin(v *List) *List {
+    return MakeList(MakePair(Atom(Lambda), MakePair(nil, v)))
+}
+
 func (self Compiler) compileList(p *Program, v *List) {
     var ok bool
     var at Atom
@@ -124,7 +176,6 @@ func (self Compiler) compileList(p *Program, v *List) {
         case "cons"   : self.compileArgs(p, vv, 2); p.add(OP_cons)
         case "eval"   : self.compileArgs(p, vv, 1); p.add(OP_eval)
         case "quote"  : self.compileQuote(p, vv)
-        case "begin"  : self.compileBegin(p, vv)
         case Lambda   : fallthrough
         case "lambda" : self.compileLambda(p, vv)
         case "define" : self.compileDefine(p, vv)
@@ -132,6 +183,7 @@ func (self Compiler) compileList(p *Program, v *List) {
         case "do"     : self.compileList(p, self.desugarDo(vv))
         case "let"    : self.compileList(p, self.desugarLet(vv, true))
         case "let*"   : self.compileList(p, self.desugarLet(vv, false))
+        case "begin"  : self.compileList(p, self.desugarBegin(vv))
         default       : p.i32(OP_apply, self.compileArgs(p, v, -1))
     }
 }
@@ -170,23 +222,6 @@ func (self Compiler) compileValue(p *Program, v Value) {
     }
 }
 
-func (self Compiler) compileBegin(p *Program, v *List) {
-    for v != nil {
-        ok := false
-        self.compileValue(p, v.Car)
-
-        /* drop the value if not the last one */
-        if v.Cdr != nil {
-            p.add(OP_drop)
-        }
-
-        /* check for proper list */
-        if v, ok = AsList(v.Cdr); !ok {
-            panic("compile: begin block must be a proper list: " + v.String())
-        }
-    }
-}
-
 func (self Compiler) compileQuote(p *Program, v *List) {
     if v.Cdr == nil {
         p.val(OP_ldconst, v.Car)
@@ -205,60 +240,4 @@ func (self Compiler) compileDefine(p *Program, v *List) {
 
 func (self Compiler) compileCondition(p *Program, v *List) {
 
-}
-
-func (self Compiler) desugarDo(v *List) *List {
-    return v
-}
-
-func (self Compiler) desugarLet(v *List, isParallel bool) *List {
-    var decl *List
-    var body *List
-    var defs []Value
-    var init []Value
-
-    /* list header */
-    p := v
-    n := 0
-    ok := false
-
-    /* deconstruct the list */
-    if decl, ok = AsList(p.Car); !ok { panic("compile: malformed let construct: " + v.String()) }
-    if p   , ok = AsList(p.Cdr); !ok { panic("compile: malformed let construct: " + v.String()) }
-    if body, ok = AsList(p.Car); !ok { panic("compile: malformed let construct: " + v.String()) }
-    if p.Cdr != nil                  { panic("compile: malformed let construct: " + v.String()) }
-
-    /* parse the declarations */
-    for p = decl; p != nil; n++ {
-        var s Atom
-        var q *List
-
-        /* get the pair, and move to next item */
-        if q, ok = AsList(p.Car); !ok { panic("compile: malformed let construct: " + v.String()) }
-        if p, ok = AsList(p.Cdr); !ok { panic("compile: malformed let construct: " + v.String()) }
-        if s, ok = q.Car.(Atom) ; !ok { panic("compile: malformed let construct: " + v.String()) }
-        if q, ok = AsList(q.Cdr); !ok { panic("compile: malformed let construct: " + v.String()) }
-        if q.Cdr != nil               { panic("compile: malformed let construct: " + v.String()) }
-
-        /* add to initializer list */
-        defs = append(defs, s)
-        init = append(init, q.Car)
-    }
-
-    /* let star, evaluate one value at a time */
-    if !isParallel {
-        n = 1
-    }
-
-    /* rebuild as lambda */
-    self.desugarLetRebuild(defs, init, &body, n)
-    return body
-}
-
-func (self Compiler) desugarLetRebuild(defs []Value, init []Value, body **List, p int) {
-    for i := len(defs) - p; i >= 0; i-- {
-        args := MakeList(defs[i:i + p]...)
-        expr := MakeList(Atom(Lambda), args, *body)
-        *body = MakeList(append([]Value{expr}, init[i:i + p]...)...)
-    }
 }

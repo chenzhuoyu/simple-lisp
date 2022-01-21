@@ -24,20 +24,16 @@
     (*mandelbrot val 0 iter-count)))
 
 (define (plot file)
-  (begin
-    (call-with-output-file file
-      (λ (fp)
-        (begin
-          (display "P2" fp) (newline fp)
-          (display width fp) (newline fp)
-          (display height fp) (newline fp)
-          (display max-color fp) (newline fp)
-          (do ((y 0 (+ y 1))) ((>= y height))
-            (begin
-              (do ((x 0 (+ x 1))) ((>= x width))
-                (begin
-                  (display (mandelbrot x y) fp)
-                  (display #\space fp)))
-              (newline fp))))))))
+  (call-with-output-file file
+    (λ (fp)
+      (display "P2" fp) (newline fp)
+      (display width fp) (newline fp)
+      (display height fp) (newline fp)
+      (display max-color fp) (newline fp)
+      (do ((y 0 (+ y 1))) ((>= y height))
+        (do ((x 0 (+ x 1))) ((>= x width))
+            (display (mandelbrot x y) fp)
+            (display #\space fp))
+        (newline fp)))))
 
 (plot "mandelbrot.pgm")

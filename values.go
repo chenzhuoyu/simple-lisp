@@ -48,6 +48,13 @@ func MakeList(vals ...Value) *List {
     return p
 }
 
+func MakePair(car Value, cdr Value) *List {
+    return &List {
+        Car: car,
+        Cdr: cdr,
+    }
+}
+
 func AppendValue(p **List, q **List, v Value) {
     if *p == nil {
         *p = new(List)
