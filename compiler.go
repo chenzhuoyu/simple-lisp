@@ -585,7 +585,7 @@ func (self Compiler) rebuildDo(defs []Value, init []Value, step []Value, cond Va
         MakePair(Atom("begin"), pb),
     )
 
-    /* reconstruct "do" with "lecrec" */
+    /* reconstruct "do" with "letrec" */
     return MakePair(Atom("letrec"), MakePair(
         MakeList(MakeList(Atom(name), MakeList(Atom(Lambda), pd, loop))),
         MakeList(MakePair(Atom(name), pi)),
