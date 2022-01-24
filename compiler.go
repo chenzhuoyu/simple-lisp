@@ -151,7 +151,7 @@ func (self Compiler) compileSet(p *Program, v *List) {
 
     /* emit the opcode */
     self.compileValue(p, vv.Car)
-    p.val(OP_set, sn)
+    p.str(OP_set, string(sn))
 }
 
 func (self Compiler) compileList(p *Program, v *List) {
@@ -240,7 +240,7 @@ func (self Compiler) compileValue(p *Program, v Value) {
     if v.IsIdentity() {
         p.val(OP_ldconst, v)
     } else if at, ok := v.(Atom); ok {
-        p.val(OP_ldvar, at)
+        p.str(OP_ldvar, string(at))
     } else if sl, ok := AsList(v); ok {
         self.compileList(p, sl)
     } else {
