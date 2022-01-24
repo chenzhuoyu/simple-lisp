@@ -446,7 +446,7 @@ func (self Compiler) rebuildLetRec(defs []Value, init []Value, body *List) *List
         AppendValue(&pi, &qi, MakeList(Atom("set!"), defs[i], v))
     }
 
-    /* reconstruct the statement */
+    /* reconstruct "letrec" with "let" and "set!" */
     qi.Cdr = body
     return MakePair(Atom("let"), MakePair(pd, pi))
 }
