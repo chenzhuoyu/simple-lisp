@@ -26,15 +26,20 @@ func AsString(v Value) string {
 }
 
 type (
-    Bool   bool
-    Char   rune
-    Atom   string
-    String string
-    Number float64
+    Bool    bool
+    Char    rune
+    Atom    string
+    String  string
+    Number  float64
+    Complex complex128
 )
 
 type Int struct {
     *big.Int
+}
+
+type Frac struct {
+    *big.Rat
 }
 
 type List struct {
@@ -66,20 +71,22 @@ func AppendValue(p **List, q **List, v Value) {
 }
 
 type Proc struct {
-    Body  *List
     Name  string
+    Code  Program
     Args  []string
-    Apply func(*List) Value
+    Apply func([]Value) Value
 }
 
-func (Int)    IsIdentity() bool { return true }
-func (Bool)   IsIdentity() bool { return true }
-func (Char)   IsIdentity() bool { return true }
-func (Atom)   IsIdentity() bool { return false }
-func (*List)  IsIdentity() bool { return false }
-func (*Proc)  IsIdentity() bool { return true }
-func (String) IsIdentity() bool { return true }
-func (Number) IsIdentity() bool { return true }
+func (Int)     IsIdentity() bool { return true }
+func (Frac)    IsIdentity() bool { return true }
+func (Bool)    IsIdentity() bool { return true }
+func (Char)    IsIdentity() bool { return true }
+func (Atom)    IsIdentity() bool { return false }
+func (*List)   IsIdentity() bool { return false }
+func (*Proc)   IsIdentity() bool { return true }
+func (String)  IsIdentity() bool { return true }
+func (Number)  IsIdentity() bool { return true }
+func (Complex) IsIdentity() bool { return true }
 
 func (self Bool) String() string {
     if self {
@@ -149,4 +156,8 @@ func (self String) String() string {
 
 func (self Number) String() string {
     return strconv.FormatFloat(float64(self), 'g', -1, 64)
+}
+
+func (self Complex) String() string {
+    return fmt.Sprintf("%g+%gi", real(complex128(self)), imag(complex128(self)))
 }

@@ -27,7 +27,6 @@ const (
     OP_car              // car                      : Get the first part of a pair.
     OP_cdr              // cdr                      : Get the second part of a pair.
     OP_cons             // cons                     : Construct a new pair from stack top.
-    OP_eval             // eval                     : Evaluate the value on stack top.
     OP_drop             // drop                     : Drop one value from stack.
     OP_goto             // goto         <pc>        : Goto <pc> unconditionally.
     OP_if_false         // if_false     <pc>        : If the stack top is #f, goto <pc>.
@@ -48,6 +47,15 @@ type Instr struct {
     p1 unsafe.Pointer
 }
 
+func rvstr(v Value) string {
+    switch v.(type) {
+        case Int    : return fmt.Sprintf("(int) %s", v)
+        case Frac   : return fmt.Sprintf("(frac) %s", v)
+        case Number : return fmt.Sprintf("(number) %s", v)
+        default     : return v.String()
+    }
+}
+
 func (self Instr) Iv() uint32 { return self.u1 }
 func (self Instr) Op() OpCode { return OpCode(self.u0) }
 func (self Instr) Rv() Value  { return mkval(self.p0, self.p1).pack() }
@@ -55,14 +63,13 @@ func (self Instr) Sv() string { return mkstr(self.p0, int(self.u1)).String() }
 
 func (self Instr) String() string {
     switch self.Op() {
-        case OP_ldconst : return fmt.Sprintf("ldconst     %s", self.Rv())
+        case OP_ldconst : return fmt.Sprintf("ldconst     %s", rvstr(self.Rv()))
         case OP_ldvar   : return fmt.Sprintf("ldvar       %s", self.Sv())
         case OP_define  : return fmt.Sprintf("define      %s", self.Sv())
         case OP_set     : return fmt.Sprintf("set         %s", self.Sv())
         case OP_car     : return "car"
         case OP_cdr     : return "cdr"
         case OP_cons    : return "cons"
-        case OP_eval    : return "eval"
         case OP_drop    : return "drop"
         case OP_goto    : return fmt.Sprintf("goto       @%d", self.Iv())
         case OP_if_false: return fmt.Sprintf("if_false   @%d", self.Iv())
@@ -181,7 +188,6 @@ func (self Compiler) compileList(p *Program, v *List) {
         case "car"    : self.compileArgs(p, vv, 1); p.add(OP_car)
         case "cdr"    : self.compileArgs(p, vv, 1); p.add(OP_cdr)
         case "cons"   : self.compileArgs(p, vv, 2); p.add(OP_cons)
-        case "eval"   : self.compileArgs(p, vv, 1); p.add(OP_eval)
         case "set!"   : self.compileSet(p, vv)
         case "begin"  : self.compileBlock(p, vv)
         case "quote"  : self.compileQuote(p, vv)

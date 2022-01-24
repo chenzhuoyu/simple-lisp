@@ -187,9 +187,43 @@ func (self *Parser) parseSimple() Value {
         return Int{iv}
     } else if fv, err := strconv.ParseFloat(val, 64); err == nil {
         return Number(fv)
+    } else if rv, rok := self.parseFracOrComplex(val); rok {
+        return rv
     } else {
         return Atom(val)
     }
+}
+
+func (self *Parser) parseFracOrComplex(val string) (Value, bool) {
+    if rv, ok := new(big.Rat).SetString(val); ok {
+        return Frac{rv}, true
+    } else if cv, err := strconv.ParseComplex(val, 128); err == nil {
+        return Complex(cv), true
+    } else if si := strings.IndexAny(val, "+-"); si > 0 && val[len(val) - 1] == 'i' && strings.IndexByte(val, '/') > 0 {
+        return self.parseCompositeComplex(val, si)
+    } else {
+        return nil, false
+    }
+}
+
+func (self *Parser) parseCompositeComplex(val string, si int) (Complex, bool) {
+    var ok bool
+    var rv *big.Rat
+    var iv *big.Rat
+
+    /* slice the parts out */
+    nb := len(val)
+    rs := val[:si]
+    is := val[si:nb - 1]
+
+    /* parse the real and imaginary part */
+    if rv, ok = new(big.Rat).SetString(rs); !ok { return 0, false }
+    if iv, ok = new(big.Rat).SetString(is); !ok { return 0, false }
+
+    /* compose the complex number */
+    fx, _ := rv.Float64()
+    ix, _ := iv.Float64()
+    return Complex(complex(fx, ix)), true
 }
 
 func (self *Parser) Parse() *List {
