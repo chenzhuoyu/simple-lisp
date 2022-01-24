@@ -84,7 +84,7 @@ func (self Instr) String() string {
         case OP_if_false     : return fmt.Sprintf("if.#f       @%d", self.Iv())
         case OP_assert_true  : return fmt.Sprintf("assert.#t   @%d", self.Iv())
         case OP_assert_false : return fmt.Sprintf("assert.#f   @%d", self.Iv())
-        case OP_apply        : return fmt.Sprintf("apply       %d", self.Iv())
+        case OP_apply        : return fmt.Sprintf("apply       #%d", self.Iv())
         case OP_return       : return "return"
         default              : return fmt.Sprintf("OpCode(%d)", self.Op())
     }
@@ -383,7 +383,36 @@ func (self Compiler) compileLambda(p *Program, v *List, name string) {
 }
 
 func (self Compiler) compileCondition(p *Program, v *List) {
+    var ok bool
+    var al *List
+    var pp *List
 
+    /* extract the condition and consequence clause */
+    if pp, ok = v.Cdr.(*List) ; !ok { panic("compile: malformed if construct: " + v.String()) }
+    if al, ok = AsList(pp.Cdr); !ok { panic("compile: malformed if construct: " + v.String()) }
+    if al != nil && al.Cdr != nil   { panic("compile: malformed if construct: " + v.String()) }
+
+    /* evaluate the condition expression */
+    self.compileValue(p, v.Car)
+    i := p.pc()
+    p.add(OP_if_false)
+
+    /* construct the "consequence" clause */
+    self.compileValue(p, pp.Car)
+    j := p.pc()
+    p.add(OP_goto)
+    p.pin(i)
+
+    /* check for the optional alternative clause */
+    if al == nil {
+        p.val(OP_ldconst, nil)
+        p.pin(j)
+        return
+    }
+
+    /* construct the alternative clause */
+    self.compileValue(p, al.Car)
+    p.pin(j)
 }
 
 func (self Compiler) compileShortCircuit(p *Program, v *List, kind RelKind) {
