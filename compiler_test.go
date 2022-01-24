@@ -40,29 +40,18 @@ func TestCompiler_Desugar(t *testing.T) {
 }
 
 func TestCompiler_Compile(t *testing.T) {
-    // src := `
-    //     (let ((r 1))
-    //         (do ((i 1 (+ i 1))) ((> i 10) r)
-    //             (set! r (* r i)))
-    //         (display r)
-    //         (newline))
-    // `
     src := `
-(define real-min -2.5)
-(define real-max +1.5)
-(define imag-min -2.0)
-(define imag-max +2.0)
-
-(define max-color 255)
-(define iter-count 40)
-(define escape-radius 4.0)
-
-(define width 1024)
-(define scale (/ width (- real-max real-min)))
-(define height (inexact->exact (round (* scale (- imag-max imag-min)))))
-
-(define (complex real imag)
-  (make-rectangular real imag))
-`
+        (let ((r 1))
+            (do ((i 1 (+ i 1))) ((> i 10) r)
+                (set! r (* r i)))
+            (display r)
+            (newline))
+    `
+//     src := `
+// (letrec ((fac (λ (v r)
+//                  (if (= v 0) r (fac (- v 1) (* v r))))))
+//    (display (fac 10 1))
+//    (newline))
+// `
     println(Compiler{}.Compile(CreateParser(src).Parse()).String())
 }

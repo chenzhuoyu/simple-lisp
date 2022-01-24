@@ -49,6 +49,7 @@ type Instr struct {
 
 func rvstr(v Value) string {
     switch v.(type) {
+        case nil    : return "()"
         case Int    : return fmt.Sprintf("(int) %s", v)
         case Frac   : return fmt.Sprintf("(frac) %s", v)
         case Number : return fmt.Sprintf("(number) %s", v)
@@ -116,13 +117,46 @@ func (self *Program) i32(op OpCode, val uint32) { *self = append(*self, mkins(op
 func (self *Program) str(op OpCode, val string) { *self = append(*self, mkins(op, 0, val, nil)) }
 
 func (self Program) String() string {
+    var pp *Proc
+    var vv []*Proc
+    var dis string
+    var ret []string
+
+    /* procedure queue */
+    pq := []*Proc {{
+        Name: "#[main]",
+        Code: self,
+    }}
+
+    /* BFS the queue */
+    for len(pq) != 0 {
+        pp = pq[0]
+        pq = pq[1:]
+
+        /* procedure name */
+        ret = append(ret, fmt.Sprintf(
+            "Procedure %q:\n",
+            pp.Name,
+        ))
+
+        /* disassemble the procedure */
+        dis, vv = pp.Code.Disasm()
+        ret, pq = append(ret, dis), append(pq, vv...)
+    }
+
+    /* join the entire program */
+    return strings.Join(ret, "\n")
+}
+
+func (self Program) Disasm() (string, []*Proc) {
     var idx int
     var val Instr
+    var ret []*Proc
     var buf []string
 
     /* empty program */
     if len(self) == 0 {
-        return "(empty program)"
+        return "(empty program)", nil
     }
 
     /* count the maximum digits */
@@ -132,15 +166,20 @@ func (self Program) String() string {
 
     /* disassemble every instruction */
     for idx, val = range self {
-        buf = append(buf, fmt.Sprintf(fs, idx, val))
+        if buf = append(buf, fmt.Sprintf(fs, idx, val)); val.Op() == OP_ldconst {
+            if proc, ok := val.Rv().(*Proc); ok {
+                ret = append(ret, proc)
+            }
+        }
     }
 
     /* pack into result */
-    return strings.Join(buf, "")
+    return strings.Join(buf, ""), ret
 }
 
 func (self Compiler) Compile(src *List) (p Program) {
     self.compileList(&p, src)
+    p.add(OP_return)
     return
 }
 
@@ -191,9 +230,9 @@ func (self Compiler) compileList(p *Program, v *List) {
         case "set!"   : self.compileSet(p, vv)
         case "begin"  : self.compileBlock(p, vv)
         case "quote"  : self.compileQuote(p, vv)
-        case Lambda   : fallthrough
-        case "lambda" : self.compileLambda(p, vv)
         case "define" : self.compileDefine(p, vv)
+        case Lambda   : fallthrough
+        case "lambda" : self.compileLambda(p, vv, fmt.Sprintf("#[lambda-%d]", nextid()))
         case "if"     : self.compileCondition(p, vv)
         case "do"     : self.compileList(p, self.desugarDo(vv))
         case "let"    : self.compileList(p, self.desugarLet(vv, Let))
@@ -262,15 +301,9 @@ func (self Compiler) compileQuote(p *Program, v *List) {
     }
 }
 
-func (self Compiler) compileLambda(p *Program, v *List) {
-
-}
-
 func (self Compiler) compileDefine(p *Program, v *List) {
-    var args Atom
     var name Atom
     var decl *List
-    var argv []Value
 
     /* list header */
     pp := v
@@ -292,23 +325,45 @@ func (self Compiler) compileDefine(p *Program, v *List) {
     if name, ok = decl.Car.(Atom) ; !ok { panic("compile: malformed define construct: " + v.String()) }
     if decl, ok = AsList(decl.Cdr); !ok { panic("compile: malformed define construct: " + v.String()) }
 
+    /* construct a lambda expression, and store to the variable */
+    self.compileLambda(p, MakePair(decl, pp), string(name))
+    p.str(OP_define, string(name))
+}
+
+func (self Compiler) compileLambda(p *Program, v *List, name string) {
+    var atom Atom
+    var decl *List
+    var proc *List
+    var args []string
+
+    /* list header */
+    pp := v
+    ok := true
+
+    /* extract the declaration and lambda body */
+    if decl, ok = pp.Car.(*List); !ok { panic("compile: malformed proc construct: " + v.String()) }
+    if proc, ok = AsList(pp.Cdr); !ok { panic("compile: malformed proc construct: " + v.String()) }
+
     /* parse the argument names */
     for q := decl; ok && q != nil; q, ok = AsList(q.Cdr) {
-        if args, ok = q.Car.(Atom); ok {
-            argv = append(argv, args)
+        if atom, ok = q.Car.(Atom); ok {
+            args = append(args, string(atom))
         } else {
-            panic("compile: malformed define construct: " + v.String())
+            panic("compile: malformed proc construct: " + v.String())
         }
     }
 
     /* check for list traversal */
     if !ok {
-        panic("compile: malformed define construct: " + v.String())
+        panic("compile: malformed proc construct: " + v.String())
     }
 
-    /* construct a lambda expression, and store to the variable */
-    self.compileLambda(p, MakePair(MakeList(argv...), pp))
-    p.str(OP_define, string(name))
+    /* construct a lambda expression */
+    p.val(OP_ldconst, &Proc {
+        Args: args,
+        Name: name,
+        Code: self.Compile(MakePair(Atom("begin"), proc)),
+    })
 }
 
 func (self Compiler) compileCondition(p *Program, v *List) {
