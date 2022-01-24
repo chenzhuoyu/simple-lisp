@@ -40,18 +40,18 @@ func TestCompiler_Desugar(t *testing.T) {
 }
 
 func TestCompiler_Compile(t *testing.T) {
+    // src := `
+    //     (let ((r 1))
+    //         (do ((i 1 (+ i 1))) ((> i 10) r)
+    //             (set! r (* r i)))
+    //         (display r)
+    //         (newline))
+    // `
     src := `
-        (let ((r 1))
-            (do ((i 1 (+ i 1))) ((> i 10) r)
-                (set! r (* r i)))
-            (display r)
+        (letrec ((fac (λ (v r)
+                         (if (= v 0) r (fac (- v 1) (* v r))))))
+            (display (fac 10 1))
             (newline))
     `
-//     src := `
-// (letrec ((fac (λ (v r)
-//                  (if (= v 0) r (fac (- v 1) (* v r))))))
-//    (display (fac 10 1))
-//    (newline))
-// `
     println(Compiler{}.Compile(CreateParser(src).Parse()).String())
 }

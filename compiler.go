@@ -10,6 +10,7 @@ import (
 type (
 	OpCode   uint8
     LetKind  uint8
+    RelKind  uint8
     Program  []Instr
     Compiler struct{}
 )
@@ -29,7 +30,9 @@ const (
     OP_cons             // cons                     : Construct a new pair from stack top.
     OP_drop             // drop                     : Drop one value from stack.
     OP_goto             // goto         <pc>        : Goto <pc> unconditionally.
-    OP_if_false         // if_false     <pc>        : If the stack top is #f, goto <pc>.
+    OP_if_false         // if_false     <pc>        : Pop a value from the stack, if it is #f, goto <pc>.
+    OP_assert_true      // assert_true  <pc>        : Discard the stack top if is #t, otherwise goto <pc>.
+    OP_assert_false     // assert_false <pc>        : Discard the stack top if is #f, otherwise goto <pc>.
     OP_apply            // apply        <argc>      : Apply procedure on stack with <argc> arguments.
     OP_return           // return                   : Return from procedure.
 )
@@ -38,6 +41,11 @@ const (
     Let LetKind = iota
     LetRec
     LetStar
+)
+
+const (
+    Conjunctive RelKind = iota
+    Disjunctive
 )
 
 type Instr struct {
@@ -64,19 +72,21 @@ func (self Instr) Sv() string { return mkstr(self.p0, int(self.u1)).String() }
 
 func (self Instr) String() string {
     switch self.Op() {
-        case OP_ldconst : return fmt.Sprintf("ldconst     %s", rvstr(self.Rv()))
-        case OP_ldvar   : return fmt.Sprintf("ldvar       %s", self.Sv())
-        case OP_define  : return fmt.Sprintf("define      %s", self.Sv())
-        case OP_set     : return fmt.Sprintf("set         %s", self.Sv())
-        case OP_car     : return "car"
-        case OP_cdr     : return "cdr"
-        case OP_cons    : return "cons"
-        case OP_drop    : return "drop"
-        case OP_goto    : return fmt.Sprintf("goto       @%d", self.Iv())
-        case OP_if_false: return fmt.Sprintf("if_false   @%d", self.Iv())
-        case OP_apply   : return fmt.Sprintf("apply       %d", self.Iv())
-        case OP_return  : return "return"
-        default         : return fmt.Sprintf("OpCode(%d)", self.Op())
+        case OP_ldconst      : return fmt.Sprintf("ldconst     %s", rvstr(self.Rv()))
+        case OP_ldvar        : return fmt.Sprintf("ldvar       %s", self.Sv())
+        case OP_define       : return fmt.Sprintf("define      %s", self.Sv())
+        case OP_set          : return fmt.Sprintf("set         %s", self.Sv())
+        case OP_car          : return "car"
+        case OP_cdr          : return "cdr"
+        case OP_cons         : return "cons"
+        case OP_drop         : return "drop"
+        case OP_goto         : return fmt.Sprintf("goto        @%d", self.Iv())
+        case OP_if_false     : return fmt.Sprintf("if.#f       @%d", self.Iv())
+        case OP_assert_true  : return fmt.Sprintf("assert.#t   @%d", self.Iv())
+        case OP_assert_false : return fmt.Sprintf("assert.#f   @%d", self.Iv())
+        case OP_apply        : return fmt.Sprintf("apply       %d", self.Iv())
+        case OP_return       : return "return"
+        default              : return fmt.Sprintf("OpCode(%d)", self.Op())
     }
 }
 
@@ -111,7 +121,11 @@ func mkins(op OpCode, iv uint32, sv string, rv Value) Instr {
     }
 }
 
+func (self Program) pc() int   { return len(self) }
+func (self Program) pin(p int) { self[p].u1 = uint32(self.pc()) }
+
 func (self *Program) add(op OpCode)             { *self = append(*self, mkins(op, 0, "", nil)) }
+func (self *Program) jmp(op OpCode, val int)    { *self = append(*self, mkins(op, uint32(val), "", nil)) }
 func (self *Program) val(op OpCode, val Value)  { *self = append(*self, mkins(op, 0, "", val)) }
 func (self *Program) i32(op OpCode, val uint32) { *self = append(*self, mkins(op, val, "", nil)) }
 func (self *Program) str(op OpCode, val string) { *self = append(*self, mkins(op, 0, val, nil)) }
@@ -224,6 +238,8 @@ func (self Compiler) compileList(p *Program, v *List) {
 
     /* check for built-in atoms */
     switch at {
+        case "or"     : self.compileShortCircuit(p, vv, Disjunctive)
+        case "and"    : self.compileShortCircuit(p, vv, Conjunctive)
         case "car"    : self.compileArgs(p, vv, 1); p.add(OP_car)
         case "cdr"    : self.compileArgs(p, vv, 1); p.add(OP_cdr)
         case "cons"   : self.compileArgs(p, vv, 2); p.add(OP_cons)
@@ -368,6 +384,48 @@ func (self Compiler) compileLambda(p *Program, v *List, name string) {
 
 func (self Compiler) compileCondition(p *Program, v *List) {
 
+}
+
+func (self Compiler) compileShortCircuit(p *Program, v *List, kind RelKind) {
+    var ok bool
+    var pp *List
+    var br []int
+
+    /* empty condition */
+    if v == nil {
+        panic("compile: empty condition")
+    }
+
+    /* compile the first value */
+    self.compileValue(p, v.Car)
+    pp, ok = AsList(v.Cdr)
+
+    /* compile the remaining operands with combinators */
+    for ok && pp != nil {
+        car := pp.Car
+        cdr := pp.Cdr
+
+        /* select the combinator */
+        switch br = append(br, p.pc()); kind {
+            case Conjunctive : p.add(OP_assert_true)
+            case Disjunctive : p.add(OP_assert_false)
+            default          : panic("fatal: invalid relationship kind")
+        }
+
+        /* compile the value */
+        pp, ok = AsList(cdr)
+        self.compileValue(p, car)
+    }
+
+    /* check for list errors */
+    if !ok {
+        panic("compile: malformed short-circuit construct: " + v.String())
+    }
+
+    /* pin all the branches */
+    for _, pc := range br {
+        p.pin(pc)
+    }
 }
 
 /** Syntax Desugaring **/
