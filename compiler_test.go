@@ -26,8 +26,8 @@ func TestCompiler_Desugar(t *testing.T) {
         ss: `(let ((a 1) (b 2)) (display (+ a b)) (newline))`,
     }, {
         fn: func(c Compiler, s *List) *List { return c.desugarLet(s, LetRec) },
-        ss: `(letrec ((fac (lambda (v r)
-                (if (= v 0) r (fac (- v 1) (* v r))))))
+        ss: `(letrec ((fac (λ (v r)
+                              (if (= v 0) r (fac (- v 1) (* v r))))))
                 (display (fac 10 1))
                 (newline))`,
     }, {
@@ -40,12 +40,29 @@ func TestCompiler_Desugar(t *testing.T) {
 }
 
 func TestCompiler_Compile(t *testing.T) {
+    // src := `
+    //     (let ((r 1))
+    //         (do ((i 1 (+ i 1))) ((> i 10) r)
+    //             (set! r (* r i)))
+    //         (display r)
+    //         (newline))
+    // `
     src := `
-        (let ((r 1))
-            (do ((i 1 (+ i 1))) ((> i 10) r)
-                (set! r (* r i)))
-            (display r)
-            (newline))
-    `
+(define real-min -2.5)
+(define real-max +1.5)
+(define imag-min -2.0)
+(define imag-max +2.0)
+
+(define max-color 255)
+(define iter-count 40)
+(define escape-radius 4.0)
+
+(define width 1024)
+(define scale (/ width (- real-max real-min)))
+(define height (inexact->exact (round (* scale (- imag-max imag-min)))))
+
+(define (complex real imag)
+  (make-rectangular real imag))
+`
     println(Compiler{}.Compile(CreateParser(src).Parse()).String())
 }

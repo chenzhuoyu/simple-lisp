@@ -267,7 +267,48 @@ func (self Compiler) compileLambda(p *Program, v *List) {
 }
 
 func (self Compiler) compileDefine(p *Program, v *List) {
+    var args Atom
+    var name Atom
+    var decl *List
+    var argv []Value
 
+    /* list header */
+    pp := v
+    ok := false
+
+    /* check for define expression */
+    if pp, ok = v.Cdr.(*List); !ok                  { panic("compile: malformed define construct: " + v.String()) }
+    if name, ok = v.Car.(Atom); ok && pp.Cdr != nil { panic("compile: malformed define construct: " + v.String()) }
+
+    /* defining values */
+    if ok {
+        self.compileValue(p, pp.Car)
+        p.str(OP_define, string(name))
+        return
+    }
+
+    /* defining functions, the first part must be a list */
+    if decl, ok = v.Car.(*List)   ; !ok { panic("compile: malformed define construct: " + v.String()) }
+    if name, ok = decl.Car.(Atom) ; !ok { panic("compile: malformed define construct: " + v.String()) }
+    if decl, ok = AsList(decl.Cdr); !ok { panic("compile: malformed define construct: " + v.String()) }
+
+    /* parse the argument names */
+    for q := decl; ok && q != nil; q, ok = AsList(q.Cdr) {
+        if args, ok = q.Car.(Atom); ok {
+            argv = append(argv, args)
+        } else {
+            panic("compile: malformed define construct: " + v.String())
+        }
+    }
+
+    /* check for list traversal */
+    if !ok {
+        panic("compile: malformed define construct: " + v.String())
+    }
+
+    /* construct a lambda expression, and store to the variable */
+    self.compileLambda(p, MakePair(MakeList(argv...), pp))
+    p.str(OP_define, string(name))
 }
 
 func (self Compiler) compileCondition(p *Program, v *List) {
@@ -433,7 +474,7 @@ func (self Compiler) rebuildDo(defs []Value, init []Value, step []Value, cond Va
 
     /* reconstruct "do" with "lecrec" */
     return MakePair(Atom("letrec"), MakePair(
-        MakeList(MakeList(Atom(name), MakeList(Atom("lambda"), pd, loop))),
+        MakeList(MakeList(Atom(name), MakeList(Atom(Lambda), pd, loop))),
         MakeList(MakePair(Atom(name), pi)),
     ))
 }
