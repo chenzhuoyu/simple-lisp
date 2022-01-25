@@ -128,13 +128,11 @@ func (self Int) Frac() Frac {
 }
 
 func (self Int) Double() Double {
-    v, _ := new(big.Float).SetInt(self.Int).Float64()
-    return Double(v)
+    return Double(inttodouble(self.Int))
 }
 
 func (self Int) Complex() Complex {
-    v, _ := new(big.Float).SetInt(self.Int).Float64()
-    return Complex(complex(v, 0))
+    return Complex(complex(inttodouble(self.Int), 0))
 }
 
 type Frac struct {
@@ -182,13 +180,11 @@ func (self Frac) Round() Int {
 }
 
 func (self Frac) Double() Double {
-    v, _ := self.Float64()
-    return Double(v)
+    return Double(rattodouble(self.Rat))
 }
 
 func (self Frac) Complex() Complex {
-    v, _ := self.Float64()
-    return Complex(complex(v, 0))
+    return Complex(complex(rattodouble(self.Rat), 0))
 }
 
 type List struct {

@@ -1,5 +1,9 @@
 package main
 
+import (
+    `math/big`
+)
+
 type _Num uint8
 
 const (
@@ -55,4 +59,15 @@ func numascomplex(v Value) Complex {
         case Complex : return vv
         default      : panic("cast: object is not a number: " + AsString(v))
     }
+}
+
+func inttodouble(v *big.Int) (r float64) {
+    f := big.Float{}
+    r, _ = f.SetInt(v).Float64()
+    return
+}
+
+func rattodouble(v *big.Rat) (r float64) {
+    r, _ = v.Float64()
+    return
 }

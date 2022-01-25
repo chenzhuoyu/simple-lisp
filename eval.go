@@ -125,7 +125,7 @@ func istrue(v Value) bool {
         case Bool    : return bool(vv)
         case Char    : return vv != 0
         case String  : return vv != ""
-        case Double: return vv != 0.0
+        case Double  : return vv != 0.0
         case Complex : return vv != 0i
         default      : return true
     }
