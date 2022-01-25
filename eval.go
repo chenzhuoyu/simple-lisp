@@ -1,5 +1,9 @@
 package main
 
+import (
+    `fmt`
+)
+
 type Scope struct {
     prev *Scope
     defs map[string]Value
@@ -21,11 +25,27 @@ func (self *Scope) Set(key string, val Value) {
     self.defs[key] = val
 }
 
-func (self *Scope) derive() *Scope {
-    return &Scope {
-        prev: self,
-        defs: make(map[string]Value, 16),
+func (self *Scope) Merge(proc *Proc, vals []Value) {
+    argv := len(vals)
+    argc := len(proc.Args)
+
+    /* check for args */
+    if argv != argc {
+        panic(fmt.Sprintf("eval: proc %s takes %d arguments, got %d", proc.Name, argc, argv))
     }
+
+    /* fill each args */
+    for i, v := range proc.Args {
+        self.Set(v, vals[i])
+    }
+}
+
+func (self *Scope) Derive(proc *Proc, vals []Value) (ret *Scope) {
+    ret = new(Scope)
+    ret.prev = self
+    ret.defs = make(map[string]Value, len(proc.Args))
+    ret.Merge(proc, vals)
+    return
 }
 
 func (self *Scope) resolve(name string) _ValueRef {
@@ -219,10 +239,23 @@ func Evaluate(s *Scope, p Program) Value {
                 }
             }
 
-            /* apply subroutine */
-            case OP_apply: {
+            /* apply subroutine, maybe tail-call */
+            case OP_apply, OP_tailcall: {
                 nb := int(iv.Iv())
                 vv := strem(&st, nb)
+
+                /* only loaded procs can be tail-called */
+                if op == OP_tailcall {
+                    if fn, ok := vv[0].(LoadedProc); ok {
+                        if len(st) != 0 {
+                            panic("fatal: unbalanced stack when tail-call")
+                        } else {
+                            p, pc = fn.Proc.Code, 0
+                            s.Merge(fn.Proc, vv[1:])
+                            break
+                        }
+                    }
+                }
 
                 /* check for callables */
                 if fn, ok := vv[0].(Callable); !ok {

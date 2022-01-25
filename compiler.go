@@ -35,6 +35,7 @@ const (
     OP_assert_true      // assert_true  <pc>        : Discard the stack top if is #t, otherwise goto <pc>.
     OP_assert_false     // assert_false <pc>        : Discard the stack top if is #f, otherwise goto <pc>.
     OP_apply            // apply        <argc>      : Apply procedure on stack with <argc> arguments.
+    OP_tailcall         // tailcall     <argc>      : Like OP_apply, but with tail-call optimizations.
     OP_return           // return                   : Return from procedure.
 )
 
@@ -87,6 +88,7 @@ func (self Instr) String() string {
         case OP_assert_true  : return fmt.Sprintf("assert.#t   @%d", self.Iv())
         case OP_assert_false : return fmt.Sprintf("assert.#f   @%d", self.Iv())
         case OP_apply        : return fmt.Sprintf("apply       #%d", self.Iv())
+        case OP_tailcall     : return fmt.Sprintf("tailcall    #%d", self.Iv())
         case OP_return       : return "return"
         default              : return fmt.Sprintf("OpCode(%d)", self.Op())
     }
@@ -197,6 +199,7 @@ func (self Program) Disasm() (string, []*Proc) {
 func (self Compiler) Compile(src *List) (p Program) {
     self.compileList(&p, src)
     p.add(OP_return)
+    OptimizeTailCall(p)
     return
 }
 

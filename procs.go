@@ -36,20 +36,5 @@ type LoadedProc struct {
 }
 
 func (self LoadedProc) Call(args []Value) Value {
-    argv := len(args)
-    argc := len(self.Args)
-    subr := self.Scope.derive()
-
-    /* check for args */
-    if argv != argc {
-        panic(fmt.Sprintf("eval: proc %s takes %d arguments, got %d", self.Name, argc, argv))
-    }
-
-    /* fill each args */
-    for i, v := range self.Args {
-        subr.Set(v, args[i])
-    }
-
-    /* evaluate the program */
-    return Evaluate(subr, self.Code)
+    return Evaluate(self.Scope.Derive(self.Proc, args), self.Code)
 }
