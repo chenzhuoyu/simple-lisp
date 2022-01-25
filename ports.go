@@ -27,7 +27,7 @@ func OpenFileWritePort(fname string) *Port {
     if fp, err := os.OpenFile(fname, os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0666); err != nil {
         panic(fmt.Sprintf("port: cannot open %s for write: %s", fname, err))
     } else {
-        return CreatePort(fname, fp)
+        return CreatePort(fname, AsBuffered(fp))
     }
 }
 
