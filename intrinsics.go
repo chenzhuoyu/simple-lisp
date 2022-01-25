@@ -7,21 +7,21 @@ import (
 
 type Intrinsic struct {
     Name string
-    Proc func(*Scope, []Value) Value
+    Proc func([]Value) Value
 }
 
 var (
 	intrinsicsTab = make(map[string]*Intrinsic)
 )
 
-func newIntrinsic(name string, proc func(*Scope, []Value) Value) *Intrinsic {
+func newIntrinsic(name string, proc func([]Value) Value) *Intrinsic {
     return &Intrinsic {
         Name: name,
         Proc: proc,
     }
 }
 
-func RegisterIntrinsic(name string, proc func(*Scope, []Value) Value) {
+func RegisterIntrinsic(name string, proc func([]Value) Value) {
     if _, ok := intrinsicsTab[name]; ok {
         panic("registry: duplicated intrinsic proc: " + name)
     } else {
@@ -29,8 +29,8 @@ func RegisterIntrinsic(name string, proc func(*Scope, []Value) Value) {
     }
 }
 
-func (self *Intrinsic) Call(sc *Scope, args []Value) Value {
-    return self.Proc(sc, args)
+func (self *Intrinsic) Call(args []Value) Value {
+    return self.Proc(args)
 }
 
 func (self *Intrinsic) String() string {
@@ -43,7 +43,7 @@ func (self *Intrinsic) IsIdentity() bool {
 
 /** Arithmetic Operators **/
 
-func intrinsicsAdd(_ *Scope, args []Value) Value {
+func intrinsicsAdd(args []Value) Value {
     return reduceSeq(args, MakeInt(0), func(a Value, b Value) Value {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return a.(Int).Add(b.(Int))
@@ -55,7 +55,7 @@ func intrinsicsAdd(_ *Scope, args []Value) Value {
     })
 }
 
-func intrinsicsSub(_ *Scope, args []Value) Value {
+func intrinsicsSub(args []Value) Value {
     return reduceSeq(args, MakeInt(0), func(a Value, b Value) Value {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return a.(Int).Sub(b.(Int))
@@ -67,7 +67,7 @@ func intrinsicsSub(_ *Scope, args []Value) Value {
     })
 }
 
-func intrinsicsMul(_ *Scope, args []Value) Value {
+func intrinsicsMul(args []Value) Value {
     return reduceSeq(args, MakeInt(1), func(a Value, b Value) Value {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return a.(Int).Mul(b.(Int))
@@ -79,7 +79,7 @@ func intrinsicsMul(_ *Scope, args []Value) Value {
     })
 }
 
-func intrinsicsDiv(_ *Scope, args []Value) Value {
+func intrinsicsDiv(args []Value) Value {
     return reduceSeq(args, MakeInt(1), func(a Value, b Value) Value {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return MakeFrac(a.(Int), b.(Int))
@@ -100,7 +100,7 @@ func init() {
 
 /** Comparison Operators **/
 
-func intrinsicsEq(_ *Scope, args []Value) Value {
+func intrinsicsEq(args []Value) Value {
     return Bool(reduceMonotonic(args, func(a Value, b Value) bool {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return a.(Int).Cmp(b.(Int)) == 0
@@ -112,7 +112,7 @@ func intrinsicsEq(_ *Scope, args []Value) Value {
     }))
 }
 
-func intrinsicsLt(_ *Scope, args []Value) Value {
+func intrinsicsLt(args []Value) Value {
     return Bool(reduceMonotonic(args, func(a Value, b Value) bool {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return a.(Int).Cmp(b.(Int)) < 0
@@ -124,7 +124,7 @@ func intrinsicsLt(_ *Scope, args []Value) Value {
     }))
 }
 
-func intrinsicsGt(_ *Scope, args []Value) Value {
+func intrinsicsGt(args []Value) Value {
     return Bool(reduceMonotonic(args, func(a Value, b Value) bool {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return a.(Int).Cmp(b.(Int)) > 0
@@ -136,7 +136,7 @@ func intrinsicsGt(_ *Scope, args []Value) Value {
     }))
 }
 
-func intrinsicsLte(_ *Scope, args []Value) Value {
+func intrinsicsLte(args []Value) Value {
     return Bool(reduceMonotonic(args, func(a Value, b Value) bool {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return a.(Int).Cmp(b.(Int)) <= 0
@@ -148,7 +148,7 @@ func intrinsicsLte(_ *Scope, args []Value) Value {
     }))
 }
 
-func intrinsicsGte(_ *Scope, args []Value) Value {
+func intrinsicsGte(args []Value) Value {
     return Bool(reduceMonotonic(args, func(a Value, b Value) bool {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return a.(Int).Cmp(b.(Int)) >= 0
@@ -170,7 +170,7 @@ func init() {
 
 /** Unary Arithmetic Functions **/
 
-func intrinsicsRound(_ *Scope, args []Value) Value {
+func intrinsicsRound(args []Value) Value {
     var nb int
     var vv Value
 
@@ -189,17 +189,15 @@ func intrinsicsRound(_ *Scope, args []Value) Value {
     }
 }
 
-func intrinsicsMagnitude(_ *Scope, args []Value) Value {
+func intrinsicsMagnitude(args []Value) Value {
     if len(args) != 1 {
         panic("magnitude: proc takes exact 1 argument")
-    } else if va, ok := args[0].(Complex); !ok {
-        panic("magnitude: object is not a complex number: " + AsString(args[0]))
     } else {
-        return Double(cmplx.Abs(complex128(va)))
+        return Double(cmplx.Abs(complex128(numascomplex(args[0]))))
     }
 }
 
-func intrinsicsInexactToExact(_ *Scope, args []Value) Value {
+func intrinsicsInexactToExact(args []Value) Value {
     var nb int
     var vv Value
 
@@ -226,7 +224,7 @@ func init() {
 
 /** Binary Arithmetic Functions **/
 
-func intrinsicsModulo(_ *Scope, args []Value) Value {
+func intrinsicsModulo(args []Value) Value {
     if len(args) != 2 {
         panic("modulo: proc takes exact 2 arguments")
     } else if va, ok := args[0].(Int); !ok {
@@ -238,7 +236,7 @@ func intrinsicsModulo(_ *Scope, args []Value) Value {
     }
 }
 
-func intrinsicsQuotient(_ *Scope, args []Value) Value {
+func intrinsicsQuotient(args []Value) Value {
     if len(args) != 2 {
         panic("quotient: proc takes exact 2 arguments")
     } else if va, ok := args[0].(Int); !ok {
@@ -257,7 +255,7 @@ func init() {
 
 /** Value Constructors **/
 
-func intrinsicMakeRectangular(_ *Scope, args []Value) Value {
+func intrinsicMakeRectangular(args []Value) Value {
     if len(args) != 2 {
         panic("make-rectangular: proc takes exact 2 arguments")
     } else {
@@ -271,7 +269,7 @@ func init() {
 
 /** Input / Output Functions **/
 
-func intrinsicsDisplay(_ *Scope, args []Value) Value {
+func intrinsicsDisplay(args []Value) Value {
     var ok bool
     var wp *Port
 
@@ -292,7 +290,7 @@ func intrinsicsDisplay(_ *Scope, args []Value) Value {
     return nil
 }
 
-func intrinsicsNewline(_ *Scope, args []Value) Value {
+func intrinsicsNewline(args []Value) Value {
     var ok bool
     var wp *Port
 
@@ -313,15 +311,15 @@ func intrinsicsNewline(_ *Scope, args []Value) Value {
     return nil
 }
 
-func intrinsicsCallWithOutputFile(sc *Scope, args []Value) Value {
+func intrinsicsCallWithOutputFile(args []Value) Value {
     var ok bool
-    var cb *Proc
     var fn String
+    var cb LoadedProc
 
     /* extract the file name and callback */
-    if len(args) != 2                 { panic("call-with-output-file: proc requires exact 2 arguments") }
-    if cb, ok = args[1].(*Proc) ; !ok { panic("call-with-output-file: object is not a proc: " + AsString(args[1])) }
-    if fn, ok = args[0].(String); !ok { panic("call-with-output-file: object is not a string: " + AsString(args[0])) }
+    if len(args) != 2                     { panic("call-with-output-file: proc requires exact 2 arguments") }
+    if fn, ok = args[0].(String)    ; !ok { panic("call-with-output-file: object is not a string: " + AsString(args[0])) }
+    if cb, ok = args[1].(LoadedProc); !ok { panic("call-with-output-file: object is not a callable proc: " + AsString(args[1])) }
 
     /* open a new port */
     file := string(fn)
@@ -329,7 +327,7 @@ func intrinsicsCallWithOutputFile(sc *Scope, args []Value) Value {
 
     /* call the function with the port */
     defer port.Close()
-    return cb.Call(sc, []Value{port})
+    return cb.Call([]Value{port})
 }
 
 func init() {

@@ -21,7 +21,8 @@ const (
 
 const (
     _ OpCode = iota
-    OP_ldconst          // ldconst      <val>       : Push <val> onto stack.
+    OP_ldconst          // ldconst      <val>       : Push value <val> onto stack.
+    OP_ldproc           // ldproc       <proc>      : Push proc <proc> onto stack.
     OP_ldvar            // ldvar        <name>      : Push the content of variable <name> onto stack.
     OP_define           // define       <name>      : Define a variable <name> with content at the stack top.
     OP_set              // set          <name>      : Set the variable <name> to content at the stack top.
@@ -66,12 +67,14 @@ func rvstr(v Value) string {
 
 func (self Instr) Iv() uint32 { return self.u1 }
 func (self Instr) Op() OpCode { return OpCode(self.u0) }
+func (self Instr) Fn() *Proc  { return (*Proc)(self.p0) }
 func (self Instr) Rv() Value  { return mkval(self.p0, self.p1).pack() }
 func (self Instr) Sv() string { return mkstr(self.p0, int(self.u1)).String() }
 
 func (self Instr) String() string {
     switch self.Op() {
         case OP_ldconst      : return fmt.Sprintf("ldconst     %s", rvstr(self.Rv()))
+        case OP_ldproc       : return fmt.Sprintf("ldproc      %s", self.Fn().String())
         case OP_ldvar        : return fmt.Sprintf("ldvar       %s", self.Sv())
         case OP_define       : return fmt.Sprintf("define      %s", self.Sv())
         case OP_set          : return fmt.Sprintf("set         %s", self.Sv())
@@ -99,23 +102,25 @@ func mku1(iv uint32, sv string) uint32 {
     }
 }
 
-func mkp0(sv string, rv Value) unsafe.Pointer {
-    if sv == "" && rv == nil {
+func mkp0(sv string, rv Value, fn *Proc) unsafe.Pointer {
+    if sv == "" && rv == nil && fn == nil {
         return nil
-    } else if sv != "" && rv == nil {
+    } else if sv != "" && rv == nil && fn == nil {
         return straddr(sv)
-    } else if sv == "" && rv != nil {
+    } else if sv == "" && rv != nil && fn == nil {
         return valitab(rv)
+    } else if sv == "" && rv == nil && fn != nil {
+        return unsafe.Pointer(fn)
     } else {
-        panic("fatal: encoding confliction between sv and rv")
+        panic("fatal: encoding confliction between sv, rv and fn")
     }
 }
 
-func mkins(op OpCode, iv uint32, sv string, rv Value) Instr {
+func mkins(op OpCode, iv uint32, sv string, rv Value, fn *Proc) Instr {
     return Instr {
         u0: uint32(op),
         u1: mku1(iv, sv),
-        p0: mkp0(sv, rv),
+        p0: mkp0(sv, rv, fn),
         p1: valaddr(rv),
     }
 }
@@ -123,11 +128,12 @@ func mkins(op OpCode, iv uint32, sv string, rv Value) Instr {
 func (self Program) pc() int   { return len(self) }
 func (self Program) pin(p int) { self[p].u1 = uint32(self.pc()) }
 
-func (self *Program) add(op OpCode)             { *self = append(*self, mkins(op, 0, "", nil)) }
-func (self *Program) jmp(op OpCode, val int)    { *self = append(*self, mkins(op, uint32(val), "", nil)) }
-func (self *Program) val(op OpCode, val Value)  { *self = append(*self, mkins(op, 0, "", val)) }
-func (self *Program) i32(op OpCode, val uint32) { *self = append(*self, mkins(op, val, "", nil)) }
-func (self *Program) str(op OpCode, val string) { *self = append(*self, mkins(op, 0, val, nil)) }
+func (self *Program) add(op OpCode)             { *self = append(*self, mkins(op, 0, "", nil, nil)) }
+func (self *Program) jmp(op OpCode, val int)    { *self = append(*self, mkins(op, uint32(val), "", nil, nil)) }
+func (self *Program) fnp(op OpCode, val *Proc)  { *self = append(*self, mkins(op, 0, "", nil, val)) }
+func (self *Program) val(op OpCode, val Value)  { *self = append(*self, mkins(op, 0, "", val, nil)) }
+func (self *Program) i32(op OpCode, val uint32) { *self = append(*self, mkins(op, val, "", nil, nil)) }
+func (self *Program) str(op OpCode, val string) { *self = append(*self, mkins(op, 0, val, nil, nil)) }
 
 func (self Program) String() string {
     var pp *Proc
@@ -179,10 +185,8 @@ func (self Program) Disasm() (string, []*Proc) {
 
     /* disassemble every instruction */
     for idx, val = range self {
-        if buf = append(buf, fmt.Sprintf(fs, idx, val)); val.Op() == OP_ldconst {
-            if proc, ok := val.Rv().(*Proc); ok {
-                ret = append(ret, proc)
-            }
+        if buf = append(buf, fmt.Sprintf(fs, idx, val)); val.Op() == OP_ldproc {
+            ret = append(ret, val.Fn())
         }
     }
 
@@ -374,7 +378,7 @@ func (self Compiler) compileLambda(p *Program, v *List, name string) {
     }
 
     /* construct a lambda expression */
-    p.val(OP_ldconst, &Proc {
+    p.fnp(OP_ldproc, &Proc {
         Args: args,
         Name: name,
         Code: self.Compile(MakePair(Atom("begin"), proc)),

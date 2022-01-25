@@ -11,10 +11,34 @@ type Proc struct {
     Args []string
 }
 
-func (self *Proc) Call(sc *Scope, args []Value) Value {
+func (self *Proc) String() string {
+    if len(self.Args) == 0 {
+        return fmt.Sprintf("#[proc (%s)]", self.Name)
+    } else {
+        return fmt.Sprintf("#[proc (%s %s)]", self.Name, strings.Join(self.Args, " "))
+    }
+}
+
+func (self *Proc) IsIdentity() bool {
+    return true
+}
+
+func (self *Proc) LoadWithScope(scope *Scope) LoadedProc {
+    return LoadedProc {
+        Proc  : self,
+        Scope : scope,
+    }
+}
+
+type LoadedProc struct {
+    *Proc
+    *Scope
+}
+
+func (self LoadedProc) Call(args []Value) Value {
     argv := len(args)
     argc := len(self.Args)
-    subr := sc.derive()
+    subr := self.Scope.derive()
 
     /* check for args */
     if argv != argc {
@@ -28,16 +52,4 @@ func (self *Proc) Call(sc *Scope, args []Value) Value {
 
     /* evaluate the program */
     return Evaluate(subr, self.Code)
-}
-
-func (self *Proc) String() string {
-    if len(self.Args) == 0 {
-        return fmt.Sprintf("#[proc (%s)]", self.Name)
-    } else {
-        return fmt.Sprintf("#[proc (%s %s)]", self.Name, strings.Join(self.Args, " "))
-    }
-}
-
-func (self *Proc) IsIdentity() bool {
-    return true
 }

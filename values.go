@@ -15,7 +15,7 @@ type Value interface {
 
 type Callable interface {
     Value
-    Call(*Scope, []Value) Value
+    Call([]Value) Value
 }
 
 func AsList(v Value) (*List, bool) {
@@ -34,6 +34,7 @@ func AsString(v Value) string {
 func AsDisplay(v Value) string {
     switch vv := v.(type) {
         case nil    : return "()"
+        case Char   : return string(vv)
         case String : return string(vv)
         default     : return v.String()
     }

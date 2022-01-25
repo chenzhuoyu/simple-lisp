@@ -131,6 +131,11 @@ func Evaluate(s *Scope, p Program) Value {
                 st = append(st, iv.Rv())
             }
 
+            /* load proc into stack */
+            case OP_ldproc: {
+                st = append(st, iv.Fn().LoadWithScope(s))
+            }
+
             /* load variable into stack */
             case OP_ldvar: {
                 if vv, ok := s.Get(iv.Sv()); ok {
@@ -189,7 +194,7 @@ func Evaluate(s *Scope, p Program) Value {
 
             /* branch if the stack top is #f */
             case OP_if_false: {
-                if istrue(stpop(&st)) {
+                if !istrue(stpop(&st)) {
                     if pc = int(iv.Iv()); pc < 0 || pc >= len(p) {
                         panic("fatal: branch out of scope: " + iv.String())
                     }
@@ -199,18 +204,18 @@ func Evaluate(s *Scope, p Program) Value {
             /* assert the stack top is true, otherwise branch */
             case OP_assert_true: {
                 if istrue(sttop(st)) {
-                    if _, pc = stpop(&st), int(iv.Iv()); pc < 0 || pc >= len(p) {
-                        panic("fatal: branch out of scope: " + iv.String())
-                    }
+                    stpop(&st)
+                } else if pc = int(iv.Iv()); pc < 0 || pc >= len(p) {
+                    panic("fatal: branch out of scope: " + iv.String())
                 }
             }
 
             /* assert the stack top is false, otherwise branch */
             case OP_assert_false: {
                 if !istrue(sttop(st)) {
-                    if _, pc = stpop(&st), int(iv.Iv()); pc < 0 || pc >= len(p) {
-                        panic("fatal: branch out of scope: " + iv.String())
-                    }
+                    stpop(&st)
+                } else if pc = int(iv.Iv()); pc < 0 || pc >= len(p) {
+                    panic("fatal: branch out of scope: " + iv.String())
                 }
             }
 
@@ -223,7 +228,7 @@ func Evaluate(s *Scope, p Program) Value {
                 if fn, ok := vv[0].(Callable); !ok {
                     panic("eval: object is not appliable: " + AsString(vv[0]))
                 } else {
-                    st = append(st, fn.Call(s, vv[1:]))
+                    st = append(st, fn.Call(vv[1:]))
                 }
             }
 
