@@ -3,7 +3,6 @@ package main
 import (
     `bufio`
     `fmt`
-    `io/ioutil`
     `os`
     `strings`
 )
@@ -35,7 +34,7 @@ func usage() {
 }
 
 func runScript(fname string) {
-    if src, err := ioutil.ReadFile(fname); err != nil {
+    if src, err := os.ReadFile(fname); err != nil {
         panic(fmt.Sprintf("slisp: unable to read %s: %s", fname, err))
     } else {
         Evaluate(CreateGlobalScope(), Compiler{}.Compile(CreateParser(string(src)).Parse()))
