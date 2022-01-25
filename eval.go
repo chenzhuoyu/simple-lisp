@@ -278,5 +278,5 @@ func Evaluate(s *Scope, p Program) Value {
 
     /* should not reach here */
     dis := p.String()
-    panic("fatal: program is not returned properly: " + dis)
+    panic("fatal: program is not returned properly: \n" + dis)
 }
