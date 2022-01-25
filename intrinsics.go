@@ -44,7 +44,7 @@ func (self *Intrinsic) IsIdentity() bool {
 /** Arithmetic Operators **/
 
 func intrinsicsAdd(args []Value) Value {
-    return reduceSeq(args, MakeInt(0), func(a Value, b Value) Value {
+    return reduceSeq(args, IntZero, func(a Value, b Value) Value {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return a.(Int).Add(b.(Int))
             case _T_frac    : return numasfrac(a).Add(numasfrac(b))
@@ -56,7 +56,7 @@ func intrinsicsAdd(args []Value) Value {
 }
 
 func intrinsicsSub(args []Value) Value {
-    return reduceSeq(args, MakeInt(0), func(a Value, b Value) Value {
+    return reduceSeq(args, IntZero, func(a Value, b Value) Value {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return a.(Int).Sub(b.(Int))
             case _T_frac    : return numasfrac(a).Sub(numasfrac(b))
@@ -68,7 +68,7 @@ func intrinsicsSub(args []Value) Value {
 }
 
 func intrinsicsMul(args []Value) Value {
-    return reduceSeq(args, MakeInt(1), func(a Value, b Value) Value {
+    return reduceSeq(args, IntOne, func(a Value, b Value) Value {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return a.(Int).Mul(b.(Int))
             case _T_frac    : return numasfrac(a).Mul(numasfrac(b))
@@ -80,7 +80,7 @@ func intrinsicsMul(args []Value) Value {
 }
 
 func intrinsicsDiv(args []Value) Value {
-    return reduceSeq(args, MakeInt(1), func(a Value, b Value) Value {
+    return reduceSeq(args, IntOne, func(a Value, b Value) Value {
         switch maxtype(numtypeof(a), numtypeof(b)) {
             case _T_int     : return MakeFrac(a.(Int), b.(Int))
             case _T_frac    : return numasfrac(a).Div(numasfrac(b))

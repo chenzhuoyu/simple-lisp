@@ -10,6 +10,7 @@ func reduceSeq(vals []Value, defv Value, iter func(Value, Value) Value) (ret Val
     switch len(vals) {
         case 0  : return defv
         case 1  : return iter(defv, vals[0])
+        case 2  : return iter(vals[0], vals[1])
         default : return reduce(vals, iter)
     }
 }

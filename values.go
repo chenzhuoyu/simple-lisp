@@ -81,11 +81,10 @@ type Int struct {
     *big.Int
 }
 
-func MakeInt(v int64) Int {
-    return Int {
-        new(big.Int).SetInt64(v),
-    }
-}
+var (
+    IntOne  = Int{new(big.Int).SetInt64(1)}
+    IntZero = Int{new(big.Int).SetInt64(0)}
+)
 
 func (self Int) Cmp(v Int) int {
     return self.Int.Cmp(v.Int)
