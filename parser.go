@@ -186,7 +186,7 @@ func (self *Parser) parseSimple() Value {
     } else if iv, ok := new(big.Int).SetString(val, 0); ok {
         return Int{iv}
     } else if fv, err := strconv.ParseFloat(val, 64); err == nil {
-        return Number(fv)
+        return Double(fv)
     } else if rv, rok := self.parseFracOrComplex(val); rok {
         return rv
     } else {

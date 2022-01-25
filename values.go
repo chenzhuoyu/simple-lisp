@@ -2,6 +2,7 @@ package main
 
 import (
     `fmt`
+    `math`
     `math/big`
     `strconv`
     `strings`
@@ -10,6 +11,11 @@ import (
 type Value interface {
     String() string
     IsIdentity() bool
+}
+
+type Callable interface {
+    Value
+    Call(*Scope, []Value) Value
 }
 
 func AsList(v Value) (*List, bool) {
@@ -25,21 +31,163 @@ func AsString(v Value) string {
     }
 }
 
+func AsDisplay(v Value) string {
+    switch vv := v.(type) {
+        case nil    : return "()"
+        case String : return string(vv)
+        default     : return v.String()
+    }
+}
+
 type (
     Bool    bool
     Char    rune
     Atom    string
     String  string
-    Number  float64
+    Double  float64
     Complex complex128
 )
+
+func (self Double) Exact() Value {
+    if vv := new(big.Rat).SetFloat64(float64(self)); vv.IsInt() {
+        return Int{vv.Num()}
+    } else {
+        return Frac{vv}
+    }
+}
+
+func (self Double) Round() Double {
+    return Double(math.RoundToEven(float64(self)))
+}
+
+func (self Complex) Exact() Value {
+    if x := complex128(self); imag(x) != 0 {
+        panic("exact: cannot measure the exact value of complex numbers with non-zero imaginary part")
+    } else {
+        return Double(real(x)).Exact()
+    }
+}
+
+func (self Complex) Round() Double {
+    if x := complex128(self); imag(x) != 0 {
+        panic("round: cannot round complex numbers with non-zero imaginary part")
+    } else {
+        return Double(real(x)).Round()
+    }
+}
 
 type Int struct {
     *big.Int
 }
 
+func MakeInt(v int64) Int {
+    return Int {
+        new(big.Int).SetInt64(v),
+    }
+}
+
+func (self Int) Cmp(v Int) int {
+    return self.Int.Cmp(v.Int)
+}
+
+func (self Int) Add(v Int) Int {
+    return Int {
+        new(big.Int).Add(self.Int, v.Int),
+    }
+}
+
+func (self Int) Sub(v Int) Int {
+    return Int {
+        new(big.Int).Sub(self.Int, v.Int),
+    }
+}
+
+func (self Int) Mul(v Int) Int {
+    return Int {
+        new(big.Int).Mul(self.Int, v.Int),
+    }
+}
+
+func (self Int) Div(v Int) Int {
+    return Int {
+        new(big.Int).Quo(self.Int, v.Int),
+    }
+}
+
+func (self Int) Mod(v Int) Int {
+    return Int {
+        new(big.Int).Rem(self.Int, v.Int),
+    }
+}
+
+func (self Int) Frac() Frac {
+    return Frac {
+        new(big.Rat).SetInt(self.Int),
+    }
+}
+
+func (self Int) Double() Double {
+    v, _ := new(big.Float).SetInt(self.Int).Float64()
+    return Double(v)
+}
+
+func (self Int) Complex() Complex {
+    v, _ := new(big.Float).SetInt(self.Int).Float64()
+    return Complex(complex(v, 0))
+}
+
 type Frac struct {
     *big.Rat
+}
+
+func MakeFrac(a Int, b Int) Frac {
+    return Frac {
+        new(big.Rat).SetFrac(a.Int, b.Int),
+    }
+}
+
+func (self Frac) Cmp(v Frac) int {
+    return self.Rat.Cmp(v.Rat)
+}
+
+func (self Frac) Add(v Frac) Frac {
+    return Frac {
+        new(big.Rat).Add(self.Rat, v.Rat),
+    }
+}
+
+func (self Frac) Sub(v Frac) Frac {
+    return Frac {
+        new(big.Rat).Sub(self.Rat, v.Rat),
+    }
+}
+
+func (self Frac) Mul(v Frac) Frac {
+    return Frac {
+        new(big.Rat).Mul(self.Rat, v.Rat),
+    }
+}
+
+func (self Frac) Div(v Frac) Frac {
+    return Frac {
+        new(big.Rat).Quo(self.Rat, v.Rat),
+    }
+}
+
+func (self Frac) Round() Int {
+    return Int {
+        new(big.Int).Quo(self.Num(), self.Denom()),
+    }
+}
+
+func (self Frac) Double() Double {
+    v, _ := self.Float64()
+    return Double(v)
+}
+
+func (self Frac) Complex() Complex {
+    v, _ := self.Float64()
+    return Complex(complex(v, 0))
 }
 
 type List struct {
@@ -70,22 +218,14 @@ func AppendValue(p **List, q **List, v Value) {
     }
 }
 
-type Proc struct {
-    Name  string
-    Code  Program
-    Args  []string
-    Apply func([]Value) Value
-}
-
 func (Int)     IsIdentity() bool { return true }
 func (Frac)    IsIdentity() bool { return true }
 func (Bool)    IsIdentity() bool { return true }
 func (Char)    IsIdentity() bool { return true }
 func (Atom)    IsIdentity() bool { return false }
 func (*List)   IsIdentity() bool { return false }
-func (*Proc)   IsIdentity() bool { return true }
 func (String)  IsIdentity() bool { return true }
-func (Number)  IsIdentity() bool { return true }
+func (Double)  IsIdentity() bool { return true }
 func (Complex) IsIdentity() bool { return true }
 
 func (self Bool) String() string {
@@ -142,20 +282,22 @@ func (self *List) String() string {
     )
 }
 
-func (self *Proc) String() string {
-    if len(self.Args) == 0 {
-        return fmt.Sprintf("#[proc (%s)]", self.Name)
-    } else {
-        return fmt.Sprintf("#[proc (%s %s)]", self.Name, strings.Join(self.Args, " "))
-    }
-}
-
 func (self String) String() string {
     return strconv.Quote(string(self))
 }
 
-func (self Number) String() string {
-    return strconv.FormatFloat(float64(self), 'g', -1, 64)
+func (self Double) String() string {
+    vv := strconv.FormatFloat(float64(self), 'g', -1, 64)
+    vp := strings.Split(vv, "e")
+
+    /* already contains a decimal point */
+    if strings.ContainsRune(vp[0], '.') {
+        return vv
+    }
+
+    /* add one if needed */
+    vp[0] += ".0"
+    return strings.Join(vp, "e")
 }
 
 func (self Complex) String() string {

@@ -32,7 +32,7 @@ func TestCompiler_Desugar(t *testing.T) {
                 (newline))`,
     }, {
         fn: func(c Compiler, s *List) *List { return c.desugarLet(s, LetStar) },
-        ss: `(let ((a 1) (b 2)) (display (+ a b)) (newline))`,
+        ss: `(let* ((a 1) (b 2)) (display (+ a b)) (newline))`,
     }}
     for _, ts := range tests {
         println(ts.fn(Compiler{}, stmt(ts.ss).Cdr.(*List)).String())

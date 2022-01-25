@@ -23,10 +23,10 @@ const (
     _ OpCode = iota
     OP_ldconst          // ldconst      <val>       : Push <val> onto stack.
     OP_ldvar            // ldvar        <name>      : Push the content of variable <name> onto stack.
-    OP_define           // define       <name>      : Define a global variable <name> with content at the stack top.
+    OP_define           // define       <name>      : Define a variable <name> with content at the stack top.
     OP_set              // set          <name>      : Set the variable <name> to content at the stack top.
-    OP_car              // car                      : Get the first part of a pair.
-    OP_cdr              // cdr                      : Get the second part of a pair.
+    OP_car              // car                      : Get the first half of a pair.
+    OP_cdr              // cdr                      : Get the second half of a pair.
     OP_cons             // cons                     : Construct a new pair from stack top.
     OP_drop             // drop                     : Drop one value from stack.
     OP_goto             // goto         <pc>        : Goto <pc> unconditionally.
@@ -57,11 +57,10 @@ type Instr struct {
 
 func rvstr(v Value) string {
     switch v.(type) {
-        case nil    : return "()"
         case Int    : return fmt.Sprintf("(int) %s", v)
         case Frac   : return fmt.Sprintf("(frac) %s", v)
-        case Number : return fmt.Sprintf("(number) %s", v)
-        default     : return v.String()
+        case Double : return fmt.Sprintf("(float) %s", v)
+        default     : return AsString(v)
     }
 }
 
@@ -561,11 +560,11 @@ func (self Compiler) desugarLet(v *List, kind LetKind) *List {
     for i := len(defs) - n; i >= 0; i-- {
         arg := MakeList(defs[i:i + n]...)
         ref := MakePair(Atom(Lambda), MakePair(arg, body))
-        body = MakeList(append([]Value{ref}, init[i:i + n]...)...)
+        body = MakeList(MakeList(append([]Value{ref}, init[i:i + n]...)...))
     }
 
     /* all done */
-    return body
+    return body.Car.(*List)
 }
 
 /** Core Language Rebuilding **/
