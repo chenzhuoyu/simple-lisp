@@ -5,7 +5,7 @@ A simple `Lisp` interpreter written in Go.
 Command to run the Mandelbrot Set example program:
 
 ```bash
-$ output/simple_lisp mandelbrot.scm
+$ go run . mandelbrot.scm
 ```
 
 It should give you this image as output:
