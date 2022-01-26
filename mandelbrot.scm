@@ -17,7 +17,7 @@
 (define (mandelbrot x y)
   (define (*mandelbrot z0 z rem)
     (if (or (= rem 0) (>= (magnitude z) escape-radius))
-        (round (* (/ rem iter-count) max-color))
+        (inexact->exact (round (* (/ rem iter-count) max-color)))
         (*mandelbrot z0 (+ (* z z) z0) (- rem 1))))
   (let ((val (complex (+ (/ x scale) real-min)
                       (+ (/ y scale) imag-min))))

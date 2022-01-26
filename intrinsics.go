@@ -2,7 +2,6 @@ package main
 
 import (
     `fmt`
-    `math/cmplx`
 )
 
 type Intrinsic struct {
@@ -44,51 +43,39 @@ func (self *Intrinsic) IsIdentity() bool {
 /** Arithmetic Operators **/
 
 func intrinsicsAdd(args []Value) Value {
-    return reduceSeq(args, IntZero, func(a Value, b Value) Value {
-        switch maxtype(numtypeof(a), numtypeof(b)) {
-            case _T_int     : return a.(Int).Add(b.(Int))
-            case _T_frac    : return numasfrac(a).Add(numasfrac(b))
-            case _T_float   : return numasfloat(a) + numasfloat(b)
-            case _T_complex : return numascomplex(a) + numascomplex(b)
-            default         : panic("+: unreachable")
-        }
-    })
+    switch len(args) {
+        case 0  : return Int(0)
+        case 1  : return AsNumber(args[0])
+        case 2  : return NumberAdd(args[0], args[1])
+        default : return reduceSequential(args, NumberAdd)
+    }
 }
 
 func intrinsicsSub(args []Value) Value {
-    return reduceSeq(args, IntZero, func(a Value, b Value) Value {
-        switch maxtype(numtypeof(a), numtypeof(b)) {
-            case _T_int     : return a.(Int).Sub(b.(Int))
-            case _T_frac    : return numasfrac(a).Sub(numasfrac(b))
-            case _T_float   : return numasfloat(a) - numasfloat(b)
-            case _T_complex : return numascomplex(a) - numascomplex(b)
-            default         : panic("-: unreachable")
-        }
-    })
+    switch len(args) {
+        case 0  : panic("-: proc requies at least 1 argument")
+        case 1  : return NumberNeg(args[0])
+        case 2  : return NumberSub(args[0], args[1])
+        default : return reduceSequential(args, NumberSub)
+    }
 }
 
 func intrinsicsMul(args []Value) Value {
-    return reduceSeq(args, IntOne, func(a Value, b Value) Value {
-        switch maxtype(numtypeof(a), numtypeof(b)) {
-            case _T_int     : return a.(Int).Mul(b.(Int))
-            case _T_frac    : return numasfrac(a).Mul(numasfrac(b))
-            case _T_float   : return numasfloat(a) * numasfloat(b)
-            case _T_complex : return numascomplex(a) * numascomplex(b)
-            default         : panic("*: unreachable")
-        }
-    })
+    switch len(args) {
+        case 0  : return Int(1)
+        case 1  : return AsNumber(args[0])
+        case 2  : return NumberMul(args[0], args[1])
+        default : return reduceSequential(args, NumberMul)
+    }
 }
 
 func intrinsicsDiv(args []Value) Value {
-    return reduceSeq(args, IntOne, func(a Value, b Value) Value {
-        switch maxtype(numtypeof(a), numtypeof(b)) {
-            case _T_int     : return MakeFrac(a.(Int), b.(Int))
-            case _T_frac    : return numasfrac(a).Div(numasfrac(b))
-            case _T_float   : return numasfloat(a) / numasfloat(b)
-            case _T_complex : return numascomplex(a) / numascomplex(b)
-            default         : panic("/: unreachable")
-        }
-    })
+    switch len(args) {
+        case 0  : panic("/: proc requies at least 1 argument")
+        case 1  : return NumberInv(args[0])
+        case 2  : return NumberDiv(args[0], args[1])
+        default : return reduceSequential(args, NumberDiv)
+    }
 }
 
 func init() {
@@ -101,63 +88,48 @@ func init() {
 /** Comparison Operators **/
 
 func intrinsicsEq(args []Value) Value {
-    return Bool(reduceMonotonic(args, func(a Value, b Value) bool {
-        switch maxtype(numtypeof(a), numtypeof(b)) {
-            case _T_int     : return a.(Int).Cmp(b.(Int)) == 0
-            case _T_frac    : return numasfrac(a).Cmp(numasfrac(b)) == 0
-            case _T_float   : return numasfloat(a) == numasfloat(b)
-            case _T_complex : return numascomplex(a) == numascomplex(b)
-            default         : panic("=: unreachable")
-        }
-    }))
+    switch len(args) {
+        case 0  : fallthrough
+        case 1  : return Bool(true)
+        case 2  : return Bool(NumberCompareEq(args[0], args[1]))
+        default : return Bool(reduceConvolution(args, NumberCompareEq))
+    }
 }
 
 func intrinsicsLt(args []Value) Value {
-    return Bool(reduceMonotonic(args, func(a Value, b Value) bool {
-        switch maxtype(numtypeof(a), numtypeof(b)) {
-            case _T_int     : return a.(Int).Cmp(b.(Int)) < 0
-            case _T_frac    : return numasfrac(a).Cmp(numasfrac(b)) < 0
-            case _T_float   : return numasfloat(a) < numasfloat(b)
-            case _T_complex : panic("<: complex numbers can only be compared for equality")
-            default         : panic("<: unreachable")
-        }
-    }))
+    switch len(args) {
+        case 0  : fallthrough
+        case 1  : return Bool(true)
+        case 2  : return Bool(NumberCompareLt(args[0], args[1]))
+        default : return Bool(reduceConvolution(args, NumberCompareLt))
+    }
 }
 
 func intrinsicsGt(args []Value) Value {
-    return Bool(reduceMonotonic(args, func(a Value, b Value) bool {
-        switch maxtype(numtypeof(a), numtypeof(b)) {
-            case _T_int     : return a.(Int).Cmp(b.(Int)) > 0
-            case _T_frac    : return numasfrac(a).Cmp(numasfrac(b)) > 0
-            case _T_float   : return numasfloat(a) > numasfloat(b)
-            case _T_complex : panic(">: complex numbers can only be compared for equality")
-            default         : panic(">: unreachable")
-        }
-    }))
+    switch len(args) {
+        case 0  : fallthrough
+        case 1  : return Bool(true)
+        case 2  : return Bool(NumberCompareGt(args[0], args[1]))
+        default : return Bool(reduceConvolution(args, NumberCompareGt))
+    }
 }
 
 func intrinsicsLte(args []Value) Value {
-    return Bool(reduceMonotonic(args, func(a Value, b Value) bool {
-        switch maxtype(numtypeof(a), numtypeof(b)) {
-            case _T_int     : return a.(Int).Cmp(b.(Int)) <= 0
-            case _T_frac    : return numasfrac(a).Cmp(numasfrac(b)) <= 0
-            case _T_float   : return numasfloat(a) <= numasfloat(b)
-            case _T_complex : panic("<=: complex numbers can only be compared for equality")
-            default         : panic("<=: unreachable")
-        }
-    }))
+    switch len(args) {
+        case 0  : fallthrough
+        case 1  : return Bool(true)
+        case 2  : return Bool(NumberCompareLte(args[0], args[1]))
+        default : return Bool(reduceConvolution(args, NumberCompareLte))
+    }
 }
 
 func intrinsicsGte(args []Value) Value {
-    return Bool(reduceMonotonic(args, func(a Value, b Value) bool {
-        switch maxtype(numtypeof(a), numtypeof(b)) {
-            case _T_int     : return a.(Int).Cmp(b.(Int)) >= 0
-            case _T_frac    : return numasfrac(a).Cmp(numasfrac(b)) >= 0
-            case _T_float   : return numasfloat(a) >= numasfloat(b)
-            case _T_complex : panic(">=: complex numbers can only be compared for equality")
-            default         : panic(">=: unreachable")
-        }
-    }))
+    switch len(args) {
+        case 0  : fallthrough
+        case 1  : return Bool(true)
+        case 2  : return Bool(NumberCompareGte(args[0], args[1]))
+        default : return Bool(reduceConvolution(args, NumberCompareGte))
+    }
 }
 
 func init() {
@@ -171,21 +143,10 @@ func init() {
 /** Unary Arithmetic Functions **/
 
 func intrinsicsRound(args []Value) Value {
-    var nb int
-    var vv Value
-
-    /* check for argument count */
-    if nb = len(args); nb != 1 {
+    if len(args) != 1 {
         panic("round: proc takes exact 1 argument")
-    }
-
-    /* round the number */
-    switch vv = args[0]; v := vv.(type) {
-        case Int     : return vv
-        case Frac    : return v.Round()
-        case Double  : return v.Round()
-        case Complex : return v.Round()
-        default      : panic("round: object is not a number: " + AsString(args[0]))
+    } else {
+        return NumberRound(args[0])
     }
 }
 
@@ -193,26 +154,15 @@ func intrinsicsMagnitude(args []Value) Value {
     if len(args) != 1 {
         panic("magnitude: proc takes exact 1 argument")
     } else {
-        return Double(cmplx.Abs(complex128(numascomplex(args[0]))))
+        return NumberMagnitude(args[0])
     }
 }
 
 func intrinsicsInexactToExact(args []Value) Value {
-    var nb int
-    var vv Value
-
-    /* check for argument count */
-    if nb = len(args); nb != 1 {
+    if len(args) != 1 {
         panic("inexact->exact: proc takes exact 1 argument")
-    }
-
-    /* convert the number */
-    switch vv = args[0]; v := vv.(type) {
-        case Int     : return vv
-        case Frac    : return vv
-        case Double  : return v.Exact()
-        case Complex : return v.Exact()
-        default      : panic("inexact->exact: object is not a number: " + AsString(args[0]))
+    } else {
+        return AsNumber(args[0]).AsInt()
     }
 }
 
@@ -232,7 +182,7 @@ func intrinsicsModulo(args []Value) Value {
     } else if vb, ok := args[1].(Int); !ok {
         panic("modulo: object is not an integer: " + AsString(args[1]))
     } else {
-        return va.Mod(vb)
+        return va % vb
     }
 }
 
@@ -244,7 +194,7 @@ func intrinsicsQuotient(args []Value) Value {
     } else if vb, ok := args[1].(Int); !ok {
         panic("quotient: object is not an integer: " + AsString(args[1]))
     } else {
-        return va.Div(vb)
+        return va / vb
     }
 }
 
@@ -259,7 +209,7 @@ func intrinsicMakeRectangular(args []Value) Value {
     if len(args) != 2 {
         panic("make-rectangular: proc takes exact 2 arguments")
     } else {
-        return Complex(complex(float64(numasfloat(args[0])), float64(numasfloat(args[1]))))
+        return Complex(complex(float64(AsNumber(args[0]).AsFloat()), float64(AsNumber(args[1]).AsFloat())))
     }
 }
 

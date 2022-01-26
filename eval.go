@@ -120,13 +120,12 @@ func strem(st *[]Value, nb int) (v []Value) {
 func istrue(v Value) bool {
     switch vv := v.(type) {
         case nil     : return false
-        case Int     : return vv.BitLen() != 0
-        case Frac    : return vv.Num().BitLen() != 0
+        case Int     : return vv != 0
         case Bool    : return bool(vv)
         case Char    : return vv != 0
+        case Float   : return vv != 0.0
         case String  : return vv != ""
-        case Double  : return vv != 0.0
-        case Complex : return vv != 0i
+        case Complex : return vv != 0
         default      : return true
     }
 }

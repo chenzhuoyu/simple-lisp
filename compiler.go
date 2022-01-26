@@ -59,10 +59,9 @@ type Instr struct {
 
 func rvstr(v Value) string {
     switch v.(type) {
-        case Int    : return fmt.Sprintf("(int) %s", v)
-        case Frac   : return fmt.Sprintf("(frac) %s", v)
-        case Double : return fmt.Sprintf("(float) %s", v)
-        default     : return AsString(v)
+        case Int   : return fmt.Sprintf("(int) %s", v)
+        case Float : return fmt.Sprintf("(float) %s", v)
+        default    : return AsString(v)
     }
 }
 

@@ -1,73 +1,155 @@
 package main
 
 import (
-    `math/big`
+    `math`
 )
 
-type _Num uint8
+type NumKind uint8
 
 const (
-    _T_int _Num = iota
-    _T_frac
-    _T_float
-    _T_complex
+    NumInt NumKind = iota
+    NumFloat
+    NumComplex
 )
 
-func maxtype(a _Num, b _Num) _Num {
-    if a > b {
-        return a
+func (self NumKind) Coerce(vt NumKind) NumKind {
+    if vt > self {
+        return vt
     } else {
-        return b
+        return self
     }
 }
 
-func numtypeof(v Value) _Num {
-    switch v.(type) {
-        case Int     : return _T_int
-        case Frac    : return _T_frac
-        case Double  : return _T_float
-        case Complex : return _T_complex
-        default      : panic("cast: object is not a number: " + AsString(v))
+/** Number Converting **/
+
+func AsNumber(v Value) Numerical {
+    if r, ok := v.(Numerical); !ok {
+        panic("eval: object is not a number: " + AsString(v))
+    } else {
+        return r
     }
 }
 
-func numasfrac(v Value) Frac {
-    switch vv := v.(type) {
-        case Int     : return vv.Frac()
-        case Frac    : return vv
-        case Double  : panic("cast: cannot convert float to frac: " + v.String())
-        case Complex : panic("cast: cannot convert complex to frac: " + v.String())
-        default      : panic("cast: object is not a number: " + AsString(v))
+func AsNumbers(v1 Value, v2 Value) (Numerical, Numerical, NumKind) {
+    r1, r2 := AsNumber(v1), AsNumber(v2)
+    return r1, r2, r1.Kind().Coerce(r2.Kind())
+}
+
+/** Number Arithmetic **/
+
+func NumberNeg(v Value) Value {
+    switch x := AsNumber(v); x.Kind() {
+        case NumInt     : return -x.AsInt()
+        case NumFloat   : return -x.AsFloat()
+        case NumComplex : return -x.AsComplex()
+        default         : panic("-: unreachable")
     }
 }
 
-func numasfloat(v Value) Double {
-    switch vv := v.(type) {
-        case Int     : return vv.Double()
-        case Frac    : return vv.Double()
-        case Double  : return vv
-        case Complex : panic("cast: cannot convert complex to float: " + v.String())
-        default      : panic("cast: object is not a number: " + AsString(v))
+func NumberInv(v Value) Value {
+    switch x := AsNumber(v); x.Kind() {
+        case NumInt     : fallthrough
+        case NumFloat   : return 1.0 / x.AsFloat()
+        case NumComplex : return 1.0 / x.AsComplex()
+        default         : panic("-: unreachable")
     }
 }
 
-func numascomplex(v Value) Complex {
-    switch vv := v.(type) {
-        case Int     : return vv.Complex()
-        case Frac    : return vv.Complex()
-        case Double  : return Complex(complex(float64(vv), 0))
-        case Complex : return vv
-        default      : panic("cast: object is not a number: " + AsString(v))
+func NumberAdd(a Value, b Value) Value {
+    switch x, y, vt := AsNumbers(a, b); vt {
+        case NumInt     : return x.AsInt() + y.AsInt()
+        case NumFloat   : return x.AsFloat() + y.AsFloat()
+        case NumComplex : return x.AsComplex() + y.AsComplex()
+        default         : panic("+: unreachable")
     }
 }
 
-func inttodouble(v *big.Int) (r float64) {
-    f := big.Float{}
-    r, _ = f.SetInt(v).Float64()
-    return
+func NumberSub(a Value, b Value) Value {
+    switch x, y, vt := AsNumbers(a, b); vt {
+        case NumInt     : return x.AsInt() - y.AsInt()
+        case NumFloat   : return x.AsFloat() - y.AsFloat()
+        case NumComplex : return x.AsComplex() - y.AsComplex()
+        default         : panic("-: unreachable")
+    }
 }
 
-func rattodouble(v *big.Rat) (r float64) {
-    r, _ = v.Float64()
-    return
+func NumberMul(a Value, b Value) Value {
+    switch x, y, vt := AsNumbers(a, b); vt {
+        case NumInt     : return x.AsInt() * y.AsInt()
+        case NumFloat   : return x.AsFloat() * y.AsFloat()
+        case NumComplex : return x.AsComplex() * y.AsComplex()
+        default         : panic("*: unreachable")
+    }
+}
+
+func NumberDiv(a Value, b Value) Value {
+    switch x, y, vt := AsNumbers(a, b); vt {
+        case NumInt     : fallthrough
+        case NumFloat   : return x.AsFloat() / y.AsFloat()
+        case NumComplex : return x.AsComplex() / y.AsComplex()
+        default         : panic("/: unreachable")
+    }
+}
+
+func NumberRound(v Value) Value {
+    switch x := AsNumber(v); x.Kind() {
+        case NumInt     : return v
+        case NumFloat   : fallthrough
+        case NumComplex : return Float(math.RoundToEven(float64(x.AsFloat())))
+        default         : panic("inexact->exact: unreachable")
+    }
+}
+
+func NumberMagnitude(v Value) Value {
+    switch x := AsNumber(v); x.Kind() {
+        case NumInt     : fallthrough
+        case NumFloat   : return v
+        case NumComplex : return x.AsComplex().Magnitude()
+        default         : panic("inexact->exact: unreachable")
+    }
+}
+
+func NumberCompareEq(a Value, b Value) bool {
+    switch x, y, vt := AsNumbers(a, b); vt {
+        case NumInt     : return x.AsInt() == y.AsInt()
+        case NumFloat   : return x.AsFloat() == y.AsFloat()
+        case NumComplex : return x.AsComplex() == y.AsComplex()
+        default         : panic("=: unreachable")
+    }
+}
+
+func NumberCompareLt(a Value, b Value) bool {
+    switch x, y, vt := AsNumbers(a, b); vt {
+        case NumInt     : return x.AsInt() < y.AsInt()
+        case NumFloat   : return x.AsFloat() < y.AsFloat()
+        case NumComplex : panic("<: complex numbers can only be compared for equality")
+        default         : panic("<: unreachable")
+    }
+}
+
+func NumberCompareGt(a Value, b Value) bool {
+    switch x, y, vt := AsNumbers(a, b); vt {
+        case NumInt     : return x.AsInt() > y.AsInt()
+        case NumFloat   : return x.AsFloat() > y.AsFloat()
+        case NumComplex : panic(">: complex numbers can only be compared for equality")
+        default         : panic(">: unreachable")
+    }
+}
+
+func NumberCompareLte(a Value, b Value) bool {
+    switch x, y, vt := AsNumbers(a, b); vt {
+        case NumInt     : return x.AsInt() <= y.AsInt()
+        case NumFloat   : return x.AsFloat() <= y.AsFloat()
+        case NumComplex : panic("<=: complex numbers can only be compared for equality")
+        default         : panic("<=: unreachable")
+    }
+}
+
+func NumberCompareGte(a Value, b Value) bool {
+    switch x, y, vt := AsNumbers(a, b); vt {
+        case NumInt     : return x.AsInt() >= y.AsInt()
+        case NumFloat   : return x.AsFloat() >= y.AsFloat()
+        case NumComplex : panic(">=: complex numbers can only be compared for equality")
+        default         : panic(">=: unreachable")
+    }
 }

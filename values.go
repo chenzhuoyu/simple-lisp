@@ -3,7 +3,6 @@ package main
 import (
     `fmt`
     `math`
-    `math/big`
     `strconv`
     `strings`
 )
@@ -16,6 +15,14 @@ type Value interface {
 type Callable interface {
     Value
     Call([]Value) Value
+}
+
+type Numerical interface {
+    Value
+    Kind() NumKind
+    AsInt() Int
+    AsFloat() Float
+    AsComplex() Complex
 }
 
 func AsList(v Value) (*List, bool) {
@@ -41,150 +48,14 @@ func AsDisplay(v Value) string {
 }
 
 type (
+    Int     int64
     Bool    bool
     Char    rune
     Atom    string
+    Float   float64
     String  string
-    Double  float64
     Complex complex128
 )
-
-func (self Double) Exact() Value {
-    if vv := new(big.Rat).SetFloat64(float64(self)); vv.IsInt() {
-        return Int{vv.Num()}
-    } else {
-        return Frac{vv}
-    }
-}
-
-func (self Double) Round() Double {
-    return Double(math.RoundToEven(float64(self)))
-}
-
-func (self Complex) Exact() Value {
-    if x := complex128(self); imag(x) != 0 {
-        panic("exact: cannot measure the exact value of complex numbers with non-zero imaginary part")
-    } else {
-        return Double(real(x)).Exact()
-    }
-}
-
-func (self Complex) Round() Double {
-    if x := complex128(self); imag(x) != 0 {
-        panic("round: cannot round complex numbers with non-zero imaginary part")
-    } else {
-        return Double(real(x)).Round()
-    }
-}
-
-type Int struct {
-    *big.Int
-}
-
-var (
-    IntOne  = Int{new(big.Int).SetInt64(1)}
-    IntZero = Int{new(big.Int).SetInt64(0)}
-)
-
-func (self Int) Cmp(v Int) int {
-    return self.Int.Cmp(v.Int)
-}
-
-func (self Int) Add(v Int) Int {
-    return Int {
-        new(big.Int).Add(self.Int, v.Int),
-    }
-}
-
-func (self Int) Sub(v Int) Int {
-    return Int {
-        new(big.Int).Sub(self.Int, v.Int),
-    }
-}
-
-func (self Int) Mul(v Int) Int {
-    return Int {
-        new(big.Int).Mul(self.Int, v.Int),
-    }
-}
-
-func (self Int) Div(v Int) Int {
-    return Int {
-        new(big.Int).Quo(self.Int, v.Int),
-    }
-}
-
-func (self Int) Mod(v Int) Int {
-    return Int {
-        new(big.Int).Rem(self.Int, v.Int),
-    }
-}
-
-func (self Int) Frac() Frac {
-    return Frac {
-        new(big.Rat).SetInt(self.Int),
-    }
-}
-
-func (self Int) Double() Double {
-    return Double(inttodouble(self.Int))
-}
-
-func (self Int) Complex() Complex {
-    return Complex(complex(inttodouble(self.Int), 0))
-}
-
-type Frac struct {
-    *big.Rat
-}
-
-func MakeFrac(a Int, b Int) Frac {
-    return Frac {
-        new(big.Rat).SetFrac(a.Int, b.Int),
-    }
-}
-
-func (self Frac) Cmp(v Frac) int {
-    return self.Rat.Cmp(v.Rat)
-}
-
-func (self Frac) Add(v Frac) Frac {
-    return Frac {
-        new(big.Rat).Add(self.Rat, v.Rat),
-    }
-}
-
-func (self Frac) Sub(v Frac) Frac {
-    return Frac {
-        new(big.Rat).Sub(self.Rat, v.Rat),
-    }
-}
-
-func (self Frac) Mul(v Frac) Frac {
-    return Frac {
-        new(big.Rat).Mul(self.Rat, v.Rat),
-    }
-}
-
-func (self Frac) Div(v Frac) Frac {
-    return Frac {
-        new(big.Rat).Quo(self.Rat, v.Rat),
-    }
-}
-
-func (self Frac) Round() Int {
-    return Int {
-        new(big.Int).Quo(self.Num(), self.Denom()),
-    }
-}
-
-func (self Frac) Double() Double {
-    return Double(rattodouble(self.Rat))
-}
-
-func (self Frac) Complex() Complex {
-    return Complex(complex(rattodouble(self.Rat), 0))
-}
 
 type List struct {
     Car Value
@@ -214,15 +85,20 @@ func AppendValue(p **List, q **List, v Value) {
     }
 }
 
-func (Int)     IsIdentity() bool { return true }
-func (Frac)    IsIdentity() bool { return true }
-func (Bool)    IsIdentity() bool { return true }
-func (Char)    IsIdentity() bool { return true }
+/** Value Protocol **/
+
+func (Int)     IsIdentity() bool { return true  }
+func (Bool)    IsIdentity() bool { return true  }
+func (Char)    IsIdentity() bool { return true  }
 func (Atom)    IsIdentity() bool { return false }
 func (*List)   IsIdentity() bool { return false }
-func (String)  IsIdentity() bool { return true }
-func (Double)  IsIdentity() bool { return true }
-func (Complex) IsIdentity() bool { return true }
+func (Float)   IsIdentity() bool { return true  }
+func (String)  IsIdentity() bool { return true  }
+func (Complex) IsIdentity() bool { return true  }
+
+func (self Int) String() string {
+    return strconv.FormatInt(int64(self), 10)
+}
 
 func (self Bool) String() string {
     if self {
@@ -278,11 +154,7 @@ func (self *List) String() string {
     )
 }
 
-func (self String) String() string {
-    return strconv.Quote(string(self))
-}
-
-func (self Double) String() string {
+func (self Float) String() string {
     vv := strconv.FormatFloat(float64(self), 'g', -1, 64)
     vp := strings.Split(vv, "e")
 
@@ -296,6 +168,46 @@ func (self Double) String() string {
     return strings.Join(vp, "e")
 }
 
+func (self String) String() string {
+    return strconv.Quote(string(self))
+}
+
 func (self Complex) String() string {
     return fmt.Sprintf("%g+%gi", real(complex128(self)), imag(complex128(self)))
+}
+
+/** Numerical Protocols for Int **/
+
+func (self Int) Kind()      NumKind { return NumInt }
+func (self Int) AsInt()     Int     { return self }
+func (self Int) AsFloat()   Float   { return Float(self) }
+func (self Int) AsComplex() Complex { return Complex(complex(float64(self), 0)) }
+
+/** Numerical Protocols for Float **/
+
+func (self Float) Kind()      NumKind { return NumFloat }
+func (self Float) AsInt()     Int     { return Int(self) }
+func (self Float) AsFloat()   Float   { return self }
+func (self Float) AsComplex() Complex { return Complex(complex(float64(self), 0)) }
+
+/** Numerical Protocols for Complex **/
+
+func (self Complex) Kind()      NumKind { return NumComplex }
+func (self Complex) AsInt()     Int     { return Int(self.AsRealNumber()) }
+func (self Complex) AsFloat()   Float   { return Float(self.AsRealNumber()) }
+func (self Complex) AsComplex() Complex { return self }
+
+func (self Complex) Magnitude() Float {
+    return Float(math.Hypot(
+        real(complex128(self)),
+        imag(complex128(self)),
+    ))
+}
+
+func (self Complex) AsRealNumber() float64 {
+    if v := complex128(self); imag(v) != 0 {
+        panic("cast: cannot convert complex numbers with non-zero imaginary part into real numbers")
+    } else {
+        return real(v)
+    }
 }
