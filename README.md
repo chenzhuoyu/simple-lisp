@@ -10,4 +10,4 @@ $ output/simple_lisp mandelbrot.scm
 
 It should give you this image as output:
 
-![Mandelbrot Set](mandelbrot.pgm)
+![Mandelbrot Set](mandelbrot.png)
