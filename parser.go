@@ -34,7 +34,7 @@ func CreateParser(src string) *Parser {
     }
 }
 
-func (self *Parser) error(msg string) error {
+func (self *Parser) error(msg string) string {
     var row int
     var col int
 
@@ -47,7 +47,7 @@ func (self *Parser) error(msg string) error {
     }
 
     /* build the error */
-    return fmt.Errorf(
+    return fmt.Sprintf(
         "syntax error at row %d, column %d: %s",
         row + 1,
         col + 1,
