@@ -2,13 +2,17 @@ package main
 
 import (
     `fmt`
-    `io`
     `os`
 )
 
 type Port struct {
     name string
-    file io.ReadWriteCloser
+    file FileLike
+}
+
+type FileLike interface {
+    Write(p []byte) (int, error)
+    Close() error
 }
 
 var PortStdout = &Port {
@@ -16,7 +20,7 @@ var PortStdout = &Port {
     file: os.Stdout,
 }
 
-func CreatePort(name string, file io.ReadWriteCloser) *Port {
+func CreatePort(name string, file FileLike) *Port {
     return &Port {
         name: name,
         file: file,
@@ -27,14 +31,12 @@ func OpenFileWritePort(fname string) *Port {
     if fp, err := os.OpenFile(fname, os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0666); err != nil {
         panic(fmt.Sprintf("port: cannot open %s for write: %s", fname, err))
     } else {
-        return CreatePort(fname, AsBuffered(fp))
+        return CreatePort(fname, CreateBufferedWriter(fp))
     }
 }
 
 func (self *Port) Close() {
-    if err := self.file.Close(); err != nil {
-        _, _ = fmt.Fprintf(os.Stderr, "warn: cannot close %s, ignored.", self)
-    }
+    _ = self.file.Close()
 }
 
 func (self *Port) Write(v []byte) {

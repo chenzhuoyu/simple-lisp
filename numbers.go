@@ -51,7 +51,7 @@ func NumberInv(v Value) Value {
         case NumInt     : fallthrough
         case NumFloat   : return 1.0 / x.AsFloat()
         case NumComplex : return 1.0 / x.AsComplex()
-        default         : panic("-: unreachable")
+        default         : panic("/: unreachable")
     }
 }
 
@@ -96,7 +96,7 @@ func NumberRound(v Value) Value {
         case NumInt     : return v
         case NumFloat   : fallthrough
         case NumComplex : return Float(math.RoundToEven(float64(x.AsFloat())))
-        default         : panic("inexact->exact: unreachable")
+        default         : panic("round: unreachable")
     }
 }
 
@@ -105,7 +105,7 @@ func NumberMagnitude(v Value) Value {
         case NumInt     : fallthrough
         case NumFloat   : return v
         case NumComplex : return x.AsComplex().Magnitude()
-        default         : panic("inexact->exact: unreachable")
+        default         : panic("magnitude: unreachable")
     }
 }
 
