@@ -4,7 +4,6 @@ import (
     `fmt`
     `strconv`
     `strings`
-    `unicode`
 )
 
 var _CharTab = map[string]rune {
@@ -18,8 +17,21 @@ var _CharTab = map[string]rune {
     "rubout"    : 0x7f,
 }
 
+var _SpaceTab = [...]bool {
+    ' '  : true,
+    '\t' : true,
+    '\n' : true,
+    '\v' : true,
+    '\f' : true,
+    '\r' : true,
+}
+
+func isSpace(ch rune) bool {
+    return int(ch) < len(_SpaceTab) && _SpaceTab[ch]
+}
+
 func isAtomChar(ch rune) bool {
-    return !(ch == '(' || ch == ')' || ch == '"' || unicode.IsSpace(ch))
+    return !(ch == '(' || ch == ')' || ch == '"' || isSpace(ch))
 }
 
 type Parser struct {
@@ -62,7 +74,7 @@ func (self *Parser) noEOF(topLevel bool) {
 }
 
 func (self *Parser) noSpace() {
-    for self.p < len(self.s) && unicode.IsSpace(self.s[self.p]) {
+    for self.p < len(self.s) && isSpace(self.s[self.p]) {
         self.p++
     }
 }
@@ -171,17 +183,17 @@ func (self *Parser) parseSimple() Value {
         self.p++
     }
 
-    /* slice the value */
-    val := string(self.s[p:self.p])
-    low := strings.ToLower(val)
+    /* extract the token */
+    src := self.s[p:self.p]
+    val := string(src)
 
     /* check for token types */
-    if low == "#t" {
+    if val == "#t" {
         return Bool(true)
-    } else if low == "#f" {
+    } else if val == "#f" {
         return Bool(false)
-    } else if strings.HasPrefix(low, `#\`) {
-        return self.parseChar(low[2:])
+    } else if strings.HasPrefix(val, `#\`) {
+        return self.parseChar(val[2:])
     } else if iv, err := strconv.ParseInt(val, 0, 64); err == nil {
         return Int(iv)
     } else if fv, err := strconv.ParseFloat(val, 64); err == nil {

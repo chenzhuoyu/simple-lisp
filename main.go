@@ -5,25 +5,36 @@ import (
     `os`
 )
 
-func main() {
+func readfile(fname string) string {
+    var nbr int
     var err error
-    var src []byte
-    var ins Compiler
+    var rfp *os.File
 
-    /* check for args */
+    /* open the file */
+    if rfp, err = os.OpenFile(fname, os.O_RDONLY, 0); err != nil {
+        panic(fmt.Sprintf("io: unable to open %s: %s", fname, err))
+    }
+
+    /* allocate memory for file */
+    buf := make([]byte, MaxBufferSize)
+    ret := make([]byte, 0, MaxBufferSize)
+
+    /* read all data */
+    for err == nil {
+        if nbr, err = rfp.Read(buf); nbr != 0 {
+            ret = append(ret, buf[:nbr]...)
+        }
+    }
+
+    /* close the file, and convert the result to string */
+    _ = rfp.Close()
+    return string(ret)
+}
+
+func main() {
     if len(os.Args) != 2 || os.Args[1] == "-h" {
         println(fmt.Sprintf("usage: %s [-h] [file-name]", os.Args[0]))
-        os.Exit(1)
+    } else {
+        Evaluate(CreateGlobalScope(), Compiler{}.Compile(CreateParser(readfile(os.Args[1])).Parse()))
     }
-
-    /* read the source */
-    if src, err = os.ReadFile(os.Args[1]); err != nil {
-        panic(fmt.Sprintf("slisp: unable to read %s: %s", os.Args[1], err))
-    }
-
-    /* evaluate the source */
-    Evaluate(
-        CreateGlobalScope(),
-        ins.Compile(CreateParser(string(src)).Parse()),
-    )
 }

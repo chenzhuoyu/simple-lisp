@@ -97,7 +97,7 @@ func (String)  IsIdentity() bool { return true  }
 func (Complex) IsIdentity() bool { return true  }
 
 func (self Int) String() string {
-    return strconv.FormatInt(int64(self), 10)
+    return strconv.Itoa(int(self))
 }
 
 func (self Bool) String() string {
@@ -173,7 +173,11 @@ func (self String) String() string {
 }
 
 func (self Complex) String() string {
-    return fmt.Sprintf("%g+%gi", real(complex128(self)), imag(complex128(self)))
+    if im := imag(complex128(self)); im >= 0 {
+        return fmt.Sprintf("%g+%gi", real(complex128(self)), im)
+    } else {
+        return fmt.Sprintf("%g-%gi", real(complex128(self)), -im)
+    }
 }
 
 /** Numerical Protocols for Int **/
