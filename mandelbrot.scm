@@ -11,16 +11,13 @@
 (define scale (/ width (- real-max real-min)))
 (define height (inexact->exact (round (* scale (- imag-max imag-min)))))
 
-(define (complex real imag)
-  (make-rectangular real imag))
-
 (define (mandelbrot x y)
   (define (*mandelbrot z0 z rem)
     (if (or (= rem 0) (>= (magnitude z) escape-radius))
         (inexact->exact (round (* (/ rem iter-count) max-color)))
         (*mandelbrot z0 (+ (* z z) z0) (- rem 1))))
-  (let ((val (complex (+ (/ x scale) real-min)
-                      (+ (/ y scale) imag-min))))
+  (let ((val (make-rectangular (+ (/ x scale) real-min)
+                               (+ (/ y scale) imag-min))))
     (*mandelbrot val 0 iter-count)))
 
 (define (plot file)
