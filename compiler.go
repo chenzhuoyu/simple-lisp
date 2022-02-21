@@ -8,7 +8,7 @@ import (
 )
 
 type (
-	OpCode   uint8
+    OpCode   uint8
     LetKind  uint8
     RelKind  uint8
     Program  []Instr
@@ -210,9 +210,9 @@ func (self Compiler) compileSet(p *Program, v *List) {
     var vv *List
 
     /* unpack the variable name and value */
-    if sn, ok = v.Car.(Atom) ; !ok { panic("compile: malformed let! construct: " + v.String()) }
-    if vv, ok = v.Cdr.(*List); !ok { panic("compile: malformed let! construct: " + v.String()) }
-    if vv.Cdr != nil               { panic("compile: malformed let! construct: " + v.String()) }
+    if sn, ok = v.Car.(Atom) ; !ok { panic("compile: malformed set! construct: " + v.String()) }
+    if vv, ok = v.Cdr.(*List); !ok { panic("compile: malformed set! construct: " + v.String()) }
+    if vv.Cdr != nil               { panic("compile: malformed set! construct: " + v.String()) }
 
     /* emit the opcode */
     self.compileValue(p, vv.Car)
